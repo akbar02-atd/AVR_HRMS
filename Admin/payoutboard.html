@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payout Transaction Logs · AVR HRMS Admin</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Supabase CDN & Config -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../static/js/config.js"></script>
+
+  <link rel="stylesheet" href="../static/css/styles.css">
+  <style>
+    .main-site-header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-dark) 100%);
+      color: #fff;
+      padding: 16px 24px 0;
+      border-bottom: 4px solid var(--amber);
+      margin-bottom: 24px;
+    }
+    .header-container {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .brand-identity { display: flex; align-items: center; gap: 16px; }
+    .company-logo { height: 44px; width: auto; object-fit: contain; }
+    .company-title { color: #fff; font-size: 18px; margin: 0; }
+    .portal-subtext { font-size: 12px; color: #bfcbdc; letter-spacing: .05em; text-transform: uppercase; }
+
+    /* Summary Metric Cards */
+    .payout-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .payout-card {
+      background: #fdfcf8;
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      padding: 14px 18px;
+      border-top: 3px solid var(--navy);
+    }
+    .payout-card h4 { font-size: 10px; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 4px; }
+    .payout-card .val { font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 700; color: var(--ink); }
+
+    .main-site-footer {
+      background: var(--navy-dark);
+      color: #e2e8f0;
+      padding: 36px 24px 18px;
+      margin-top: 40px;
+      border-top: 1px solid var(--rule-strong);
+    }
+    .footer-container {
+      max-width: 1200px; margin: 0 auto;
+      display: grid; grid-template-columns: 1.4fr 1fr; gap: 32px;
+    }
+    .main-site-footer h4 { color: var(--amber); font-size: 15px; margin-bottom: 10px; }
+    .footer-address { font-style: normal; font-size: 13.5px; line-height: 1.6; color: #cbd5e1; }
+    .footer-contact-list { list-style: none; padding: 0; font-size: 13.5px; }
+    .footer-contact-list li { margin-bottom: 8px; }
+    .footer-contact-list a { color: #93c5fd; text-decoration: none; }
+    .footer-bottom {
+      max-width: 1200px; margin: 24px auto 0; padding-top: 16px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.15); text-align: center; font-size: 12px; color: #94a3b8;
+    }
+
+    @media (max-width: 768px) {
+      .footer-container { grid-template-columns: 1fr; }
+      .payout-summary-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Dynamic Header -->
+  <div id="admin-header-placeholder"></div>
+
+  <main class="container">
+    <h2 style="margin-bottom: 6px;">Payout & Settlement Audit Logs</h2>
+    <p class="text-muted" style="margin-bottom: 20px;">Review past financial disbursements, filter transactions by employee or date, and export CSV reports</p>
+
+    <!-- Summary Metrics -->
+    <div class="payout-summary-grid">
+      <div class="payout-card" style="border-top-color: var(--navy);">
+        <h4>Total Gross Salary Cleared</h4>
+        <div id="sumGross" class="val">₹0</div>
+      </div>
+      <div class="payout-card" style="border-top-color: var(--amber);">
+        <h4>Total Expenses Reimbursed</h4>
+        <div id="sumExpenses" class="val">₹0</div>
+      </div>
+      <div class="payout-card" style="border-top-color: var(--teal); background: #f0fdf4;">
+        <h4>Total Cash / Net Disbursed</h4>
+        <div id="sumNetPaid" class="val" style="color: var(--teal);">₹0</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <!-- Filter Bar -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 14px; margin-bottom: 18px;">
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;">
+          <div class="form-group" style="margin-bottom: 0; min-width: 180px;">
+            <label style="font-size: 11px;">Filter Employee</label>
+            <select id="filterEmployee" onchange="renderFilteredPayouts()">
+              <option value="ALL">All Employees</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 0; min-width: 140px;">
+            <label style="font-size: 11px;">From Date</label>
+            <input type="date" id="filterFromDate" onchange="renderFilteredPayouts()">
+          </div>
+          <div class="form-group" style="margin-bottom: 0; min-width: 140px;">
+            <label style="font-size: 11px;">To Date</label>
+            <input type="date" id="filterToDate" onchange="renderFilteredPayouts()">
+          </div>
+        </div>
+
+        <button onclick="exportPayoutsCSV()" class="secondary" style="padding: 9px 16px; font-size: 12.5px; font-weight: 600;">📥 Export CSV Report</button>
+      </div>
+
+      <!-- Transaction Log Table -->
+      <div class="table-wrap">
+        <table id="payoutTable">
+          <thead>
+            <tr>
+              <th>Date & Time</th>
+              <th>Employee Username</th>
+              <th>Gross Base (₹)</th>
+              <th>Expenses (₹)</th>
+              <th>Net Amount Paid (₹)</th>
+              <th>Payment Mode</th>
+              <th>Remarks / Reference</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="7" class="empty-state">Loading payout records…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Dynamic Footer -->
+  <div id="admin-footer-placeholder"></div>
+
+  <div id="globalToast"></div>
+
+  <script>
+    let rawPayoutList = [];
+    let employeeUsers = [];
+
+    function up(val) { return (val || '').toString().toUpperCase(); }
+
+    let toastTimer;
+    function toast(msg, type) {
+      const el = document.getElementById('globalToast');
+      el.textContent = msg;
+      el.className = 'show' + (type ? ' ' + type : '');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+    }
+
+    function logout() {
+      sessionStorage.removeItem('session_user');
+      window.location.href = '../index.html';
+    }
+
+    (async function init() {
+      const cached = sessionStorage.getItem('session_user');
+      if (!cached) { window.location.href = '../index.html'; return; }
+      const user = JSON.parse(cached);
+      if (user.role !== 'admin') { window.location.href = '../index.html'; return; }
+
+      try {
+        const [hRes, fRes] = await Promise.all([
+          fetch('Adminheader.html'),
+          fetch('Adminfooter.html')
+        ]);
+        if (hRes.ok) {
+          document.getElementById('admin-header-placeholder').innerHTML = await hRes.text();
+          const activeLink = document.getElementById('nav-payouts');
+          if (activeLink) activeLink.classList.add('active');
+        }
+        if (fRes.ok) document.getElementById('admin-footer-placeholder').innerHTML = await fRes.text();
+      } catch (err) { console.error('Failed loading layout components', err); }
+
+      await Promise.all([
+        loadEmployeeDropdown(),
+        loadPayoutRecords()
+      ]);
+    })();
+
+    async function loadEmployeeDropdown() {
+      try {
+        const { data, error } = await sb
+          .from('users')
+          .select('username')
+          .or('role.eq.employee,role.eq.user')
+          .order('username');
+
+        if (error) throw error;
+        employeeUsers = data || [];
+
+        const select = document.getElementById('filterEmployee');
+        select.innerHTML = '<option value="ALL">All Employees</option>';
+        employeeUsers.forEach(e => {
+          select.innerHTML += `<option value="${e.username}">${e.username}</option>`;
+        });
+      } catch (err) {
+        console.error('Error loading employee dropdown:', err);
+      }
+    }
+
+    async function loadPayoutRecords() {
+      const tbody = document.querySelector('#payoutTable tbody');
+      try {
+        const { data, error } = await sb
+          .from('payout_records')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        rawPayoutList = data || [];
+        renderFilteredPayouts();
+      } catch (err) {
+        console.error(err);
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Could not load payout logs.</td></tr>`;
+      }
+    }
+
+    function getFilteredPayouts() {
+      const selectedUser = document.getElementById('filterEmployee').value;
+      const fromDate = document.getElementById('filterFromDate').value;
+      const toDate = document.getElementById('filterToDate').value;
+
+      return rawPayoutList.filter(p => {
+        // Employee Filter
+        if (selectedUser !== 'ALL' && p.username !== selectedUser) return false;
+
+        // Date Filter (Comparing created_at ISO string formatted as YYYY-MM-DD)
+        const recordDate = p.created_at ? p.created_at.split('T')[0] : (p.payout_date ? p.payout_date.split('T')[0] : '');
+        if (fromDate && recordDate < fromDate) return false;
+        if (toDate && recordDate > toDate) return false;
+
+        return true;
+      });
+    }
+
+    function renderFilteredPayouts() {
+      const tbody = document.querySelector('#payoutTable tbody');
+      const filtered = getFilteredPayouts();
+
+      let sumGross = 0;
+      let sumExp = 0;
+      let sumNet = 0;
+
+      tbody.innerHTML = '';
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No transaction records found matching criteria.</td></tr>`;
+      } else {
+        filtered.forEach(p => {
+          const grossVal = Number(p.gross_amount || 0);
+          const expVal = Number(p.expense_amount || 0);
+          const netVal = Number(p.net_paid || 0);
+
+          sumGross += grossVal;
+          sumExp += expVal;
+          sumNet += netVal;
+
+          const dateObj = p.created_at ? new Date(p.created_at) : (p.payout_date ? new Date(p.payout_date) : null);
+          const formattedDate = dateObj ? dateObj.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
+          const formattedTime = dateObj ? dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td data-label="Date & Time" class="mono">
+              <b>${formattedDate}</b><br>
+              <small class="text-muted">${formattedTime}</small>
+            </td>
+            <td data-label="Employee Username"><b>${p.username}</b></td>
+            <td data-label="Gross Base" class="mono">₹${grossVal.toLocaleString('en-IN')}</td>
+            <td data-label="Expenses" class="mono">₹${expVal.toLocaleString('en-IN')}</td>
+            <td data-label="Net Paid" class="mono" style="color:var(--teal); font-weight:700;">₹${netVal.toLocaleString('en-IN')}</td>
+            <td data-label="Payment Mode"><span class="status-tag status-approved">${p.payment_mode || 'UPI'}</span></td>
+            <td data-label="Remarks / Reference" style="font-size:12px; color:var(--ink-soft);">${p.remarks || '-'}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      // Update Metric Summary Cards
+      document.getElementById('sumGross').innerText = '₹' + sumGross.toLocaleString('en-IN');
+      document.getElementById('sumExpenses').innerText = '₹' + sumExp.toLocaleString('en-IN');
+      document.getElementById('sumNetPaid').innerText = '₹' + sumNet.toLocaleString('en-IN');
+    }
+
+    function exportPayoutsCSV() {
+      const filtered = getFilteredPayouts();
+      if (filtered.length === 0) {
+        toast('No payout records to export.', 'error');
+        return;
+      }
+
+      const selectedUser = document.getElementById('filterEmployee').value;
+      let csv = "data:text/csv;charset=utf-8,";
+      csv += "Transaction ID,Date & Time,Employee Username,Gross Base (INR),Expenses (INR),Net Paid (INR),Payment Mode,Remarks\n";
+
+      filtered.forEach(p => {
+        const dateStr = p.created_at ? new Date(p.created_at).toLocaleString() : '';
+        const remarks = (p.remarks || '-').replace(/"/g, '""');
+        csv += `"${p.id || ''}","${dateStr}","${p.username}","${p.gross_amount || 0}","${p.expense_amount || 0}","${p.net_paid || 0}","${p.payment_mode || ''}","${remarks}"\n`;
+      });
+
+      const uri = encodeURI(csv);
+      const link = document.createElement("a");
+      link.setAttribute("href", uri);
+      link.setAttribute("download", `Payout_Report_${selectedUser}_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast('Payout CSV report generated.', 'success');
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Owner Dashboard · AVR HRMS</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Supabase CDN, Chart.js & Config -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="../static/js/config.js"></script>
+
+  <link rel="stylesheet" href="../static/css/styles.css">
+  <style>
+    .main-site-header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-dark) 100%);
+      color: #fff;
+      padding: 16px 24px 0;
+      border-bottom: 4px solid var(--amber);
+      margin-bottom: 24px;
+    }
+    .header-container {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .brand-identity { display: flex; align-items: center; gap: 16px; }
+    .company-logo { height: 44px; width: auto; object-fit: contain; }
+    .company-title { color: #fff; font-size: 18px; margin: 0; }
+    .portal-subtext { font-size: 12px; color: #bfcbdc; letter-spacing: .05em; text-transform: uppercase; }
+
+    /* Operational Grid Metrics */
+    .dashboard-metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .metric-card-custom {
+      background: #fdfcf8;
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      padding: 16px 20px;
+      border-top: 4px solid var(--navy);
+      box-shadow: var(--shadow);
+    }
+    .metric-card-custom.green { border-top-color: var(--teal); }
+    .metric-card-custom.amber { border-top-color: var(--amber); }
+    .metric-card-custom.danger { border-top-color: var(--danger); }
+
+    .metric-card-custom h3 {
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+      margin-bottom: 6px;
+    }
+    .metric-card-custom .metric-val {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    .chart-container-box {
+      position: relative;
+      height: 280px;
+      width: 100%;
+    }
+
+    .main-site-footer {
+      background: var(--navy-dark);
+      color: #e2e8f0;
+      padding: 36px 24px 18px;
+      margin-top: 40px;
+      border-top: 1px solid var(--rule-strong);
+    }
+    .footer-container {
+      max-width: 1200px; margin: 0 auto;
+      display: grid; grid-template-columns: 1.4fr 1fr; gap: 32px;
+    }
+    .main-site-footer h4 { color: var(--amber); font-size: 15px; margin-bottom: 10px; }
+    .footer-address { font-style: normal; font-size: 13.5px; line-height: 1.6; color: #cbd5e1; }
+    .footer-contact-list { list-style: none; padding: 0; font-size: 13.5px; }
+    .footer-contact-list li { margin-bottom: 8px; }
+    .footer-contact-list a { color: #93c5fd; text-decoration: none; }
+    .footer-bottom {
+      max-width: 1200px; margin: 24px auto 0; padding-top: 16px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.15); text-align: center; font-size: 12px; color: #94a3b8;
+    }
+
+    @media (max-width: 860px) {
+      .dashboard-metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 640px) {
+      .dashboard-metrics-grid { grid-template-columns: 1fr; }
+      .footer-container { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Dynamic Header -->
+  <div id="admin-header-placeholder"></div>
+
+  <main class="container">
+    <h2 style="margin-bottom: 6px;">Executive Business Dashboard</h2>
+    <p class="text-muted" style="margin-bottom: 20px;">System-wide operational counts and financial commitments</p>
+
+    <!-- Operational Counts -->
+    <div class="dashboard-metrics-grid">
+      <div class="metric-card-custom">
+        <h3>Colleges Registered</h3>
+        <div class="metric-val" id="cntColleges">0</div>
+      </div>
+      <div class="metric-card-custom green">
+        <h3>Active Sections</h3>
+        <div class="metric-val" id="cntSections">0</div>
+      </div>
+      <div class="metric-card-custom amber">
+        <h3>Faculty / Coordinators</h3>
+        <div class="metric-val" id="cntCoordinators">0</div>
+      </div>
+      <div class="metric-card-custom">
+        <h3>Employees / Trainers</h3>
+        <div class="metric-val" id="cntEmployees">0</div>
+      </div>
+    </div>
+
+    <!-- Financial Metrics -->
+    <h3 style="margin: 28px 0 14px;">Financial Payout Overview</h3>
+    <div class="dashboard-metrics-grid">
+      <div class="metric-card-custom green">
+        <h3>Monthly Gross Pay</h3>
+        <div class="metric-val" id="finMonthly">₹0</div>
+      </div>
+      <div class="metric-card-custom green">
+        <h3>Quarterly Gross Pay</h3>
+        <div class="metric-val" id="finQuarterly">₹0</div>
+      </div>
+      <div class="metric-card-custom green">
+        <h3>Yearly Gross Pay</h3>
+        <div class="metric-val" id="finYearly">₹0</div>
+      </div>
+      <div class="metric-card-custom amber">
+        <h3>Reimbursed Expenses</h3>
+        <div class="metric-val" id="finExpenses">₹0</div>
+      </div>
+    </div>
+
+    <!-- Additional Financial Highlights -->
+    <div class="dashboard-metrics-grid" style="grid-template-columns: repeat(2, 1fr); margin-top: -8px;">
+      <div class="metric-card-custom green">
+        <h3>Total Disbursed Payouts</h3>
+        <div class="metric-val" id="finAdvances" style="color: var(--teal);">₹0</div>
+      </div>
+      <div class="metric-card-custom amber">
+        <h3>Pending Payout Approvals</h3>
+        <div class="metric-val" id="finPending">₹0</div>
+      </div>
+    </div>
+
+    <!-- Visual Charts -->
+    <div class="two-col" style="grid-template-columns: 1.6fr 1fr; margin-top: 24px;">
+      <div class="card">
+        <h3>Financial Breakdown Trends</h3>
+        <p class="text-muted" style="margin-top:2px; margin-bottom: 14px;">Comparing Base Pay vs. Travel/Food Expenses</p>
+        <div class="chart-container-box">
+          <canvas id="financialTrendChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Employee Work Types</h3>
+        <p class="text-muted" style="margin-top:2px; margin-bottom: 14px;">Staff distribution</p>
+        <div class="chart-container-box">
+          <canvas id="employmentTypeChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Dynamic Footer -->
+  <div id="admin-footer-placeholder"></div>
+
+  <div id="globalToast"></div>
+
+  <script>
+    let chartRefs = { trend: null, types: null };
+
+    function logout() {
+      sessionStorage.removeItem('session_user');
+      window.location.href = '../index.html';
+    }
+
+    (async function init() {
+      const cached = sessionStorage.getItem('session_user');
+      if (!cached) { window.location.href = '../index.html'; return; }
+      const user = JSON.parse(cached);
+      if (user.role !== 'admin') { window.location.href = '../index.html'; return; }
+
+      // Load header and footer components
+      try {
+        const [hRes, fRes] = await Promise.all([
+          fetch('Adminheader.html'),
+          fetch('Adminfooter.html')
+        ]);
+        if (hRes.ok) {
+          document.getElementById('admin-header-placeholder').innerHTML = await hRes.text();
+          // Highlight active menu tab
+          const activeLink = document.getElementById('nav-dashboard');
+          if (activeLink) activeLink.classList.add('active');
+        }
+        if (fRes.ok) document.getElementById('admin-footer-placeholder').innerHTML = await fRes.text();
+      } catch (err) { console.error('Failed loading components', err); }
+
+      await loadDashboardData();
+    })();
+
+    async function loadDashboardData() {
+      try {
+        const [
+          { data: sections },
+          { data: users },
+          { data: logs },
+          { data: payouts }
+        ] = await Promise.all([
+          sb.from('college_sections').select('college_name, id'),
+          sb.from('users').select('*'),
+          sb.from('tracker_logs').select('*'),
+          sb.from('payout_records').select('net_paid')
+        ]);
+
+        // 1. Populate Counts
+        // Distinct Colleges from college_sections
+        const uniqueColleges = new Set((sections || []).map(s => (s.college_name || '').toUpperCase().trim()).filter(Boolean));
+        document.getElementById('cntColleges').innerText = uniqueColleges.size;
+        document.getElementById('cntSections').innerText = sections ? sections.length : 0;
+        
+        const coords = users ? users.filter(u => u.role === 'coordinator' || u.role === 'faculty') : [];
+        const employees = users ? users.filter(u => u.role === 'employee' || u.role === 'user') : [];
+        document.getElementById('cntCoordinators').innerText = coords.length;
+        document.getElementById('cntEmployees').innerText = employees.length;
+
+        // Total Disbursed Payouts from payout_records
+        const totalPayouts = (payouts || []).reduce((sum, p) => sum + Number(p.net_paid || 0), 0);
+        document.getElementById('finAdvances').innerText = '₹' + totalPayouts.toLocaleString('en-IN');
+
+        // 2. Financial Calculations from Logs
+        const now = new Date();
+        const currentYM = now.toISOString().slice(0, 7); // YYYY-MM
+        const currentYear = now.getFullYear().toString();
+
+        let mGross = 0, qGross = 0, yGross = 0, totalExp = 0, totalPending = 0;
+
+        (logs || []).forEach(log => {
+          const gross = Number(log.gross_earnings || 0);
+          const exp = Number(log.travel_expense || 0) + Number(log.food_expense || 0);
+          const logDate = new Date(log.date);
+
+          // Expense totals
+          totalExp += exp;
+
+          if (log.status === 'Pending') totalPending += gross;
+
+          // Yearly
+          if (log.date && log.date.startsWith(currentYear)) {
+            yGross += gross;
+
+            // Quarterly (Last 3 months calculation)
+            const monthDiff = (now.getFullYear() - logDate.getFullYear()) * 12 + (now.getMonth() - logDate.getMonth());
+            if (monthDiff >= 0 && monthDiff < 3) {
+              qGross += gross;
+            }
+
+            // Monthly
+            if (log.date.startsWith(currentYM)) {
+              mGross += gross;
+            }
+          }
+        });
+
+        document.getElementById('finMonthly').innerText = '₹' + mGross.toLocaleString('en-IN');
+        document.getElementById('finQuarterly').innerText = '₹' + qGross.toLocaleString('en-IN');
+        document.getElementById('finYearly').innerText = '₹' + yGross.toLocaleString('en-IN');
+        document.getElementById('finExpenses').innerText = '₹' + totalExp.toLocaleString('en-IN');
+        document.getElementById('finPending').innerText = '₹' + totalPending.toLocaleString('en-IN');
+
+        // 3. Render Charts
+        renderFinancialTrendChart(logs || []);
+        renderWorkTypeChart(employees);
+
+      } catch (err) {
+        console.error('Error fetching dashboard metrics:', err);
+      }
+    }
+
+    function renderFinancialTrendChart(logs) {
+      const grouped = {};
+      logs.forEach(l => {
+        if (!l.date) return;
+        const ym = l.date.slice(0, 7);
+        if (!grouped[ym]) grouped[ym] = { base: 0, exp: 0 };
+        grouped[ym].base += Number(l.base_pay || 0);
+        grouped[ym].exp += (Number(l.travel_expense || 0) + Number(l.food_expense || 0));
+      });
+
+      const labels = Object.keys(grouped).sort();
+      const basePayData = labels.map(k => grouped[k].base);
+      const expenseData = labels.map(k => grouped[k].exp);
+
+      const ctx = document.getElementById('financialTrendChart').getContext('2d');
+      if (chartRefs.trend) chartRefs.trend.destroy();
+
+      chartRefs.trend = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels.length > 0 ? labels : ['No Data'],
+          datasets: [
+            { label: 'Base Pay (₹)', data: labels.length > 0 ? basePayData : [0], backgroundColor: '#173252', borderRadius: 4 },
+            { label: 'Expenses (₹)', data: labels.length > 0 ? expenseData : [0], backgroundColor: '#b8742f', borderRadius: 4 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'top' } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    function renderWorkTypeChart(employees) {
+      const counts = { 'Fixed Salary': 0, 'Freelance': 0, 'Intern': 0 };
+      employees.forEach(e => {
+        const type = e.employment_type || 'Freelance';
+        counts[type] = (counts[type] || 0) + 1;
+      });
+
+      const ctx = document.getElementById('employmentTypeChart').getContext('2d');
+      if (chartRefs.types) chartRefs.types.destroy();
+
+      chartRefs.types = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(counts),
+          datasets: [{ data: Object.values(counts), backgroundColor: ['#173252', '#2f6f62', '#b8742f'] }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom' } }
+        }
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employee Management · AVR HRMS Admin</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Supabase CDN & Config -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../static/js/config.js"></script>
+
+  <link rel="stylesheet" href="../static/css/styles.css">
+  <style>
+    .main-site-header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-dark) 100%);
+      color: #fff;
+      padding: 16px 24px 0;
+      border-bottom: 4px solid var(--amber);
+      margin-bottom: 24px;
+    }
+    .header-container {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .brand-identity { display: flex; align-items: center; gap: 16px; }
+    .company-logo { height: 44px; width: auto; object-fit: contain; }
+    .company-title { color: #fff; font-size: 18px; margin: 0; }
+    .portal-subtext { font-size: 12px; color: #bfcbdc; letter-spacing: .05em; text-transform: uppercase; }
+
+    /* Modal Overlay Styles */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(14, 33, 56, 0.6);
+      display: none; align-items: center; justify-content: center;
+      padding: 16px; z-index: 100;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-card { width: 100%; max-width: 520px; margin: 0; border-top: 4px solid var(--navy); }
+
+    /* Custom Checkbox Alignment */
+    .checkbox-group {
+      display: flex;
+      gap: 16px;
+      margin-top: 6px;
+    }
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .checkbox-item input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    /* Inspection Metrics Bar (Updated to 4 Columns) */
+    .audit-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin: 16px 0;
+    }
+    .audit-card {
+      background: #fdfcf8;
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      padding: 12px 14px;
+      border-top: 3px solid var(--navy);
+    }
+    .audit-card h4 { font-size: 10px; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 4px; }
+    .audit-card .val { font-family: 'IBM Plex Mono', monospace; font-size: 18px; font-weight: 700; color: var(--ink); }
+
+    .main-site-footer {
+      background: var(--navy-dark);
+      color: #e2e8f0;
+      padding: 36px 24px 18px;
+      margin-top: 40px;
+      border-top: 1px solid var(--rule-strong);
+    }
+    .footer-container {
+      max-width: 1200px; margin: 0 auto;
+      display: grid; grid-template-columns: 1.4fr 1fr; gap: 32px;
+    }
+    .main-site-footer h4 { color: var(--amber); font-size: 15px; margin-bottom: 10px; }
+    .footer-address { font-style: normal; font-size: 13.5px; line-height: 1.6; color: #cbd5e1; }
+    .footer-contact-list { list-style: none; padding: 0; font-size: 13.5px; }
+    .footer-contact-list li { margin-bottom: 8px; }
+    .footer-contact-list a { color: #93c5fd; text-decoration: none; }
+    .footer-bottom {
+      max-width: 1200px; margin: 24px auto 0; padding-top: 16px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.15); text-align: center; font-size: 12px; color: #94a3b8;
+    }
+
+    @media (max-width: 768px) { 
+      .footer-container { grid-template-columns: 1fr; } 
+      .audit-summary-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Dynamic Header -->
+  <div id="admin-header-placeholder"></div>
+
+  <main class="container">
+    <h2 style="margin-bottom: 6px;">Employee & Trainer Directory</h2>
+    <p class="text-muted" style="margin-bottom: 20px;">Provision employees, manage expense privileges, inspect logs, and process salary payouts</p>
+
+    <div class="two-col" style="grid-template-columns: 1fr 1.8fr;">
+      <!-- Provision Employee Form -->
+      <div class="card">
+        <h3>Provision New Employee</h3>
+        <form id="createEmployeeForm" style="margin-top:16px;">
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="empUsername" required placeholder="e.g. john_doe">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="empPassword" required placeholder="Temporary password">
+          </div>
+          <div class="form-group">
+            <label>Contact Phone Number</label>
+            <input type="tel" id="empPhone" required placeholder="+91 9876543210">
+          </div>
+          <div class="form-group">
+            <label>Employment Type</label>
+            <select id="empType" required onchange="toggleRateLabels()">
+              <option value="Freelance">Freelance Trainer</option>
+              <option value="Fixed Salary">Fixed Monthly Salary</option>
+              <option value="Intern">Intern / Stipend</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label id="rateLabel">Default Daily Rate (₹)</label>
+            <input type="number" id="empRate" value="2500" required min="0">
+          </div>
+
+          <!-- Expense Access Permissions -->
+          <div class="form-group">
+            <label>Allowed Expense Permissions</label>
+            <div class="checkbox-group">
+              <label class="checkbox-item">
+                <input type="checkbox" id="empAllowTravel"> Travel Expense Access
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" id="empAllowFood"> Food Expense Access
+              </label>
+            </div>
+          </div>
+
+          <button type="submit" id="createEmpBtn" style="width: 100%;">Provision Employee Account</button>
+        </form>
+      </div>
+
+      <!-- Employee Directory Table -->
+      <div class="card">
+        <h3>Active Employee Directory</h3>
+        <div class="table-wrap">
+          <table id="employeeTable">
+            <thead>
+              <tr>
+                <th>Username / Contact</th>
+                <th>Type</th>
+                <th>Rate / Pay</th>
+                <th>Expense Privileges</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auditing & Payout Inspection Zone -->
+    <div id="adminInspectionZone" class="card hidden" style="margin-top: 24px;">
+      <div class="flex-space" style="margin-bottom: 8px;">
+        <div>
+          <h3 style="margin-bottom: 2px;">Auditing Logs for: <span id="inspectedUser" class="mono" style="color:var(--navy);">-</span></h3>
+          <p class="text-muted" style="margin:0; font-size:12px;">Inspect attendance records, filter date ranges, and process payouts</p>
+        </div>
+        <button onclick="closeInspection()" class="secondary">Close Audit View</button>
+      </div>
+
+      <!-- Audit Summary Cards (Including Advance Extra Paid Card) -->
+      <div class="audit-summary-grid">
+        <div class="audit-card" style="border-top-color: var(--navy);">
+          <h4>Unsettled Gross Base Pay</h4>
+          <div id="cardGrossPay" class="val">₹0</div>
+        </div>
+        <div class="audit-card" style="border-top-color: var(--amber);">
+          <h4>Unsettled Expenses</h4>
+          <div id="cardExpenses" class="val">₹0</div>
+        </div>
+        <div class="audit-card" style="border-top-color: var(--danger);">
+          <h4>Advance / Loan Received</h4>
+          <div id="cardAdvance" class="val" style="color: var(--danger);">₹0</div>
+        </div>
+        <div class="audit-card" id="cardNetPayableContainer" style="border-top-color: var(--teal); background: #f0fdf4;">
+          <h4 id="cardNetPayableLabel">Net Pending Payable</h4>
+          <div id="cardNetPayable" class="val" style="color:var(--teal);">₹0</div>
+        </div>
+      </div>
+
+      <!-- Filters & Action Bar -->
+      <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom: 14px; flex-wrap:wrap; gap: 12px;">
+        <div style="display:flex; gap:10px; align-items:flex-end;">
+          <div class="form-group" style="margin-bottom:0; min-width:140px;">
+            <label style="font-size:11px;">From Date</label>
+            <input type="date" id="auditFromDate" onchange="renderFilteredInspectionLogs()">
+          </div>
+          <div class="form-group" style="margin-bottom:0; min-width:140px;">
+            <label style="font-size:11px;">To Date</label>
+            <input type="date" id="auditToDate" onchange="renderFilteredInspectionLogs()">
+          </div>
+          <button onclick="exportLogsCSV()" class="secondary" style="padding: 8px 14px; font-size: 12px;">📥 Export CSV</button>
+        </div>
+
+        <button onclick="openPayoutModal()" style="background: var(--teal); font-weight: 700; padding: 10px 20px;">💰 Disburse Salary Payout</button>
+      </div>
+
+      <!-- Logs Table -->
+      <div class="table-wrap">
+        <table id="inspectionTable">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>College / Section</th>
+              <th>Day Type</th>
+              <th>Description</th>
+              <th>Travel Exp.</th>
+              <th>Food Exp.</th>
+              <th>Gross Earnings</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Edit Employee Modal -->
+  <div class="modal-overlay" id="editEmployeeModal">
+    <div class="card modal-card">
+      <h3>Edit Employee Profile</h3>
+      <p class="text-muted" style="margin-top:2px;">Update profile details for <strong id="editEmpTarget">-</strong></p>
+
+      <form id="editEmployeeForm" style="margin-top:16px;">
+        <input type="hidden" id="editEmpUsername">
+        <div class="form-group">
+          <label>Contact Phone Number</label>
+          <input type="tel" id="editEmpPhone" required>
+        </div>
+        <div class="form-group">
+          <label>Employment Type</label>
+          <select id="editEmpType" required onchange="toggleEditRateLabels()">
+            <option value="Freelance">Freelance Trainer</option>
+            <option value="Fixed Salary">Fixed Monthly Salary</option>
+            <option value="Intern">Intern / Stipend</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label id="editRateLabel">Daily Rate / Base Salary (₹)</label>
+          <input type="number" id="editEmpRate" required min="0">
+        </div>
+        <div class="form-group">
+          <label>Allowed Expense Permissions</label>
+          <div class="checkbox-group">
+            <label class="checkbox-item">
+              <input type="checkbox" id="editEmpAllowTravel"> Travel Expense Access
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" id="editEmpAllowFood"> Food Expense Access
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>New Passphrase (leave blank to keep unchanged)</label>
+          <input type="password" id="editEmpPass" placeholder="Enter new password">
+        </div>
+
+        <div class="flex-space" style="margin-top:20px; margin-bottom:0;">
+          <button type="submit" id="saveEmpEditBtn">Save Changes</button>
+          <button type="button" onclick="closeEmpModal()" class="secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Salary Settlement Modal -->
+  <div class="modal-overlay" id="payoutModal">
+    <div class="card modal-card" style="max-width: 460px; border-top-color: var(--teal);">
+      <h3>Disburse Salary Payout</h3>
+      <p class="text-muted" style="margin-top:2px;">Process payment transfer for <strong id="payoutEmpTarget">-</strong></p>
+
+      <form id="payoutForm" style="margin-top:16px;">
+        <div class="form-group">
+          <label>Unsettled Gross Earnings (₹)</label>
+          <input type="number" id="payoutGross" readonly style="background:#f1f5f9; font-weight:600;">
+        </div>
+        <div class="form-group">
+          <label>Unsettled Expenses (₹)</label>
+          <input type="number" id="payoutExpenses" readonly style="background:#f1f5f9; font-weight:600;">
+        </div>
+        <div class="form-group">
+          <label>Actual Amount Transferred Today (₹)</label>
+          <input type="number" id="payoutNetPaid" required value="0" min="0" style="background:#e6f4ea; color:var(--teal); font-weight:700; font-size:18px;">
+        </div>
+        <div class="form-group">
+          <label>Payment Mode</label>
+          <select id="payoutMode">
+            <option value="UPI">UPI / GPay / PhonePe</option>
+            <option value="Bank Transfer">Bank Transfer (NEFT/IMPS)</option>
+            <option value="Cash">Cash Handover</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Transaction Reference / Remarks</label>
+          <input type="text" id="payoutRemarks" placeholder="e.g. Salary payout / UTR #123456">
+        </div>
+
+        <div class="flex-space" style="margin-top:20px; margin-bottom:0;">
+          <button type="submit" id="confirmPayoutBtn" style="background:var(--teal);">Confirm & Commit Transaction</button>
+          <button type="button" onclick="closePayoutModal()" class="secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Dynamic Footer -->
+  <div id="admin-footer-placeholder"></div>
+
+  <div id="globalToast"></div>
+
+  <script>
+    let employeeList = [];
+    let activeInspectionLogs = [];
+    let currentInspectedUser = null;
+    let currentUserAdvanceOwed = 0;
+
+    function up(val) { return (val || '').toString().toUpperCase(); }
+
+    let toastTimer;
+    function toast(msg, type) {
+      const el = document.getElementById('globalToast');
+      el.textContent = msg;
+      el.className = 'show' + (type ? ' ' + type : '');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+    }
+
+    function withLoading(btn, label) {
+      const original = btn.innerText;
+      btn.disabled = true;
+      btn.innerText = label || 'Working…';
+      return () => { btn.disabled = false; btn.innerText = original; };
+    }
+
+    function logout() {
+      sessionStorage.removeItem('session_user');
+      window.location.href = '../index.html';
+    }
+
+    (async function init() {
+      const cached = sessionStorage.getItem('session_user');
+      if (!cached) { window.location.href = '../index.html'; return; }
+      const user = JSON.parse(cached);
+      if (user.role !== 'admin') { window.location.href = '../index.html'; return; }
+
+      try {
+        const [hRes, fRes] = await Promise.all([
+          fetch('Adminheader.html'),
+          fetch('Adminfooter.html')
+        ]);
+        if (hRes.ok) {
+          document.getElementById('admin-header-placeholder').innerHTML = await hRes.text();
+          const activeLink = document.getElementById('nav-employees');
+          if (activeLink) activeLink.classList.add('active');
+        }
+        if (fRes.ok) document.getElementById('admin-footer-placeholder').innerHTML = await fRes.text();
+      } catch (err) { console.error('Failed loading components', err); }
+
+      document.getElementById('createEmployeeForm').addEventListener('submit', handleCreateEmployee);
+      document.getElementById('editEmployeeForm').addEventListener('submit', handleSaveEmpEdit);
+      document.getElementById('payoutForm').addEventListener('submit', handleConfirmPayout);
+
+      await loadEmployeeDirectory();
+    })();
+
+    function toggleRateLabels() {
+      const type = document.getElementById('empType').value;
+      const label = document.getElementById('rateLabel');
+      label.innerText = type === 'Fixed Salary' ? 'Monthly Fixed Base (₹)' : 'Default Daily Rate (₹)';
+    }
+
+    function toggleEditRateLabels() {
+      const type = document.getElementById('editEmpType').value;
+      const label = document.getElementById('editRateLabel');
+      label.innerText = type === 'Fixed Salary' ? 'Monthly Fixed Base (₹)' : 'Daily Rate / Stipend (₹)';
+    }
+
+    async function loadEmployeeDirectory() {
+      const tbody = document.querySelector('#employeeTable tbody');
+      tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Loading employees…</td></tr>`;
+
+      try {
+        const { data, error } = await sb.from('users')
+          .select('*')
+          .or('role.eq.employee,role.eq.user')
+          .order('username');
+
+        if (error) throw error;
+        employeeList = data || [];
+        renderEmployeeTable();
+      } catch (err) {
+        console.error(err);
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Could not load employee directory.</td></tr>`;
+      }
+    }
+
+    function renderEmployeeTable() {
+      const tbody = document.querySelector('#employeeTable tbody');
+      if (employeeList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No active employees provisioned.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      employeeList.forEach(e => {
+        const tr = document.createElement('tr');
+        const rateDisplay = (e.employment_type === 'Fixed Salary' ? '₹' + (e.default_rate || 0) + ' / mo' : '₹' + (e.default_rate || 0) + ' / day');
+        
+        let privs = [];
+        if (e.allow_travel_expense) privs.push('Travel');
+        if (e.allow_food_expense) privs.push('Food');
+        const privDisplay = privs.length > 0 ? privs.join(', ') : 'None';
+
+        tr.innerHTML = `
+          <td data-label="Username / Contact">
+            <b>${e.username}</b><br>
+            <small class="mono text-muted">${e.phone_number || 'No Phone'}</small>
+          </td>
+          <td data-label="Type">${e.employment_type || 'Freelance'}</td>
+          <td data-label="Rate / Pay" class="mono">${rateDisplay}</td>
+          <td data-label="Expense Privileges"><span class="mono">${privDisplay}</span></td>
+          <td data-label="Actions">
+            <button class="secondary" style="padding: 5px 10px; font-size: 12px; margin-right:2px;" onclick="inspectUserLogs('${e.username}')">Logs ↗</button>
+            <button class="secondary" style="padding: 5px 10px; font-size: 12px;" onclick="openEditEmpModal('${e.username}')">Edit</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function handleCreateEmployee(e) {
+      e.preventDefault();
+      const restore = withLoading(document.getElementById('createEmpBtn'), 'Creating…');
+
+      const user = document.getElementById('empUsername').value.trim();
+      const pass = document.getElementById('empPassword').value.trim();
+      const phone = document.getElementById('empPhone').value.trim();
+      const type = document.getElementById('empType').value;
+      const rate = parseFloat(document.getElementById('empRate').value) || 0;
+      const allowTravel = document.getElementById('empAllowTravel').checked;
+      const allowFood = document.getElementById('empAllowFood').checked;
+
+      try {
+        const { data: existing } = await sb.from('users').select('username').ilike('username', user).maybeSingle();
+        if (existing) { toast('Username already taken.', 'error'); return; }
+
+        const { error } = await sb.from('users').insert({
+          username: user,
+          password_hash: pass,
+          phone_number: phone,
+          employment_type: type,
+          default_rate: rate,
+          allow_travel_expense: allowTravel,
+          allow_food_expense: allowFood,
+          role: 'employee',
+          status: 'approved',
+          is_active: true
+        });
+
+        if (error) throw error;
+
+        document.getElementById('createEmployeeForm').reset();
+        toast('Employee account provisioned.', 'success');
+        await loadEmployeeDirectory();
+      } catch (err) {
+        console.error('Create Employee Error:', err);
+        toast(`Could not create account: ${err.message || 'Server error'}`, 'error');
+      } finally {
+        restore();
+      }
+    }
+
+    function openEditEmpModal(username) {
+      const item = employeeList.find(e => e.username === username);
+      if (!item) return;
+
+      document.getElementById('editEmpTarget').innerText = item.username;
+      document.getElementById('editEmpUsername').value = item.username;
+      document.getElementById('editEmpPhone').value = item.phone_number || '';
+      document.getElementById('editEmpType').value = item.employment_type || 'Freelance';
+      document.getElementById('editEmpRate').value = item.default_rate || 0;
+      document.getElementById('editEmpAllowTravel').checked = !!item.allow_travel_expense;
+      document.getElementById('editEmpAllowFood').checked = !!item.allow_food_expense;
+      document.getElementById('editEmpPass').value = '';
+
+      toggleEditRateLabels();
+      document.getElementById('editEmployeeModal').classList.add('active');
+    }
+
+    function closeEmpModal() {
+      document.getElementById('editEmployeeModal').classList.remove('active');
+    }
+
+    async function handleSaveEmpEdit(e) {
+      e.preventDefault();
+      const username = document.getElementById('editEmpUsername').value;
+      const phone = document.getElementById('editEmpPhone').value.trim();
+      const type = document.getElementById('editEmpType').value;
+      const rate = parseFloat(document.getElementById('editEmpRate').value) || 0;
+      const allowTravel = document.getElementById('editEmpAllowTravel').checked;
+      const allowFood = document.getElementById('editEmpAllowFood').checked;
+      const newPass = document.getElementById('editEmpPass').value.trim();
+
+      const restore = withLoading(document.getElementById('saveEmpEditBtn'), 'Saving…');
+
+      const updatePayload = {
+        phone_number: phone,
+        employment_type: type,
+        default_rate: rate,
+        allow_travel_expense: allowTravel,
+        allow_food_expense: allowFood
+      };
+      if (newPass) updatePayload.password_hash = newPass;
+
+      try {
+        const { error } = await sb.from('users').update(updatePayload).eq('username', username);
+        if (error) throw error;
+
+        toast('Employee record updated.', 'success');
+        closeEmpModal();
+        await loadEmployeeDirectory();
+      } catch (err) {
+        console.error(err);
+        toast('Could not update profile.', 'error');
+      } finally {
+        restore();
+      }
+    }
+
+    /* --- Log Auditing & Payout Operations --- */
+    async function inspectUserLogs(username) {
+      currentInspectedUser = username;
+      const zone = document.getElementById('adminInspectionZone');
+      zone.classList.remove('hidden');
+      document.getElementById('inspectedUser').innerText = username;
+      zone.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      document.getElementById('auditFromDate').value = '';
+      document.getElementById('auditToDate').value = '';
+
+      try {
+        // 1. Fetch employee daily logs
+        const { data: logsData, error: logsErr } = await sb.from('tracker_logs')
+          .select('*')
+          .eq('username', username)
+          .order('date', { ascending: false });
+
+        if (logsErr) throw logsErr;
+        activeInspectionLogs = logsData || [];
+
+        // 2. Fetch employee payout history to calculate Advance Balance
+        const { data: payoutData, error: payoutErr } = await sb.from('payout_records')
+          .select('gross_amount, expense_amount, net_paid')
+          .eq('username', username);
+
+        if (payoutErr) throw payoutErr;
+
+        // Calculate running Advance Balance: Total Disbursed Net Paid - Total Cleared Earnings
+        let totalPaidOut = 0;
+        let totalEarnedCleared = 0;
+        (payoutData || []).forEach(p => {
+          totalPaidOut += Number(p.net_paid || 0);
+          totalEarnedCleared += (Number(p.gross_amount || 0) + Number(p.expense_amount || 0));
+        });
+
+        // Advance owed = Total Cash Transferred - Total Settled Earnings
+        currentUserAdvanceOwed = Math.max(0, totalPaidOut - totalEarnedCleared);
+
+        renderFilteredInspectionLogs();
+      } catch (err) {
+        console.error(err);
+        document.querySelector('#inspectionTable tbody').innerHTML = `<tr><td colspan="8" class="empty-state">Could not load logs.</td></tr>`;
+      }
+    }
+
+    function getFilteredLogs() {
+      const fromDate = document.getElementById('auditFromDate').value;
+      const toDate = document.getElementById('auditToDate').value;
+
+      return activeInspectionLogs.filter(l => {
+        if (fromDate && l.date < fromDate) return false;
+        if (toDate && l.date > toDate) return false;
+        return true;
+      });
+    }
+
+    function renderFilteredInspectionLogs() {
+      const tbody = document.querySelector('#inspectionTable tbody');
+      const filtered = getFilteredLogs();
+
+      let pendingGrossSum = 0;
+      let pendingExpSum = 0;
+
+      tbody.innerHTML = "";
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state">No daily logs found for selected criteria.</td></tr>`;
+      } else {
+        filtered.forEach((log) => {
+          const base = Number(log.base_pay || 0);
+          const exp = Number(log.travel_expense || 0) + Number(log.food_expense || 0);
+
+          if (log.status === 'Pending') {
+            pendingGrossSum += base;
+            pendingExpSum += exp;
+          }
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td data-label="Date" class="mono">${log.date}</td>
+            <td data-label="College / Section">${up(log.college_name)} (${up(log.section)})</td>
+            <td data-label="Day Type">${log.day_type}</td>
+            <td data-label="Description">${log.description || '-'}</td>
+            <td data-label="Travel Exp." class="mono">₹${log.travel_expense || 0}</td>
+            <td data-label="Food Exp." class="mono">₹${log.food_expense || 0}</td>
+            <td data-label="Gross" class="mono" style="color:var(--teal); font-weight:700;">₹${log.gross_earnings}</td>
+            <td data-label="Status">${statusMarkup(log.status)}</td>`;
+          tbody.appendChild(tr);
+        });
+      }
+
+      // Net Pending Payable = (Pending Base + Pending Expenses) - Advance Owed
+      const netPayable = (pendingGrossSum + pendingExpSum) - currentUserAdvanceOwed;
+
+      document.getElementById('cardGrossPay').innerText = '₹' + pendingGrossSum.toLocaleString('en-IN');
+      document.getElementById('cardExpenses').innerText = '₹' + pendingExpSum.toLocaleString('en-IN');
+      document.getElementById('cardAdvance').innerText = '₹' + currentUserAdvanceOwed.toLocaleString('en-IN');
+
+      const netPayableVal = document.getElementById('cardNetPayable');
+      const netPayableLabel = document.getElementById('cardNetPayableLabel');
+      
+      if (netPayable < 0) {
+        netPayableLabel.innerText = "Advance Recovery Due";
+        netPayableVal.innerText = '-₹' + Math.abs(netPayable).toLocaleString('en-IN');
+        netPayableVal.style.color = "var(--danger)";
+      } else {
+        netPayableLabel.innerText = "Net Pending Payable";
+        netPayableVal.innerText = '₹' + netPayable.toLocaleString('en-IN');
+        netPayableVal.style.color = "var(--teal)";
+      }
+    }
+
+    function exportLogsCSV() {
+      const filtered = getFilteredLogs();
+      if (filtered.length === 0) {
+        toast('No logs available to export.', 'error');
+        return;
+      }
+
+      let csv = "data:text/csv;charset=utf-8,";
+      csv += "Date,College,Section,Day Type,Description,Travel Expense,Food Expense,Gross Earnings,Status\n";
+
+      filtered.forEach(l => {
+        const desc = (l.description || '-').replace(/"/g, '""');
+        csv += `"${l.date}","${l.college_name}","${l.section}","${l.day_type}","${desc}","${l.travel_expense || 0}","${l.food_expense || 0}","${l.gross_earnings}","${l.status}"\n`;
+      });
+
+      const uri = encodeURI(csv);
+      const link = document.createElement("a");
+      link.setAttribute("href", uri);
+      link.setAttribute("download", `Employee_Logs_${currentInspectedUser}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast('CSV report generated.', 'success');
+    }
+
+    function closeInspection() {
+      document.getElementById('adminInspectionZone').classList.add('hidden');
+      currentInspectedUser = null;
+    }
+
+    function statusMarkup(status) {
+      return status === 'Approved'
+        ? `<span class="status-tag status-approved">Approved</span>`
+        : `<span class="status-tag status-pending">Pending</span>`;
+    }
+
+    /* --- Payout Settlement Modal --- */
+    function openPayoutModal() {
+      if (!currentInspectedUser) return;
+      const filtered = getFilteredLogs();
+
+      let pendingGrossSum = 0;
+      let pendingExpSum = 0;
+      filtered.forEach(l => {
+        if (l.status === 'Pending') {
+          pendingGrossSum += Number(l.base_pay || 0);
+          pendingExpSum += (Number(l.travel_expense || 0) + Number(l.food_expense || 0));
+        }
+      });
+
+      const netPayable = Math.max(0, (pendingGrossSum + pendingExpSum) - currentUserAdvanceOwed);
+
+      document.getElementById('payoutEmpTarget').innerText = currentInspectedUser;
+      document.getElementById('payoutGross').value = pendingGrossSum;
+      document.getElementById('payoutExpenses').value = pendingExpSum;
+      document.getElementById('payoutNetPaid').value = netPayable;
+      
+      document.getElementById('payoutModal').classList.add('active');
+    }
+
+    function closePayoutModal() {
+      document.getElementById('payoutModal').classList.remove('active');
+    }
+
+    async function handleConfirmPayout(e) {
+      e.preventDefault();
+      const restore = withLoading(document.getElementById('confirmPayoutBtn'), 'Processing…');
+
+      const gross = parseFloat(document.getElementById('payoutGross').value) || 0;
+      const exp = parseFloat(document.getElementById('payoutExpenses').value) || 0;
+      const cashPaidToday = parseFloat(document.getElementById('payoutNetPaid').value) || 0;
+      const mode = document.getElementById('payoutMode').value;
+      const remarks = document.getElementById('payoutRemarks').value.trim() || 'Salary Payout Settlement';
+
+      try {
+        // 1. Insert transaction record into payout_records
+        const { error: payoutErr } = await sb.from('payout_records').insert({
+          username: currentInspectedUser,
+          gross_amount: gross,
+          expense_amount: exp,
+          net_paid: cashPaidToday,
+          payment_mode: mode,
+          remarks: remarks
+        });
+
+        if (payoutErr) {
+          console.error('Supabase Insert Error:', payoutErr);
+          toast(`Payout Failed: ${payoutErr.message}`, 'error');
+          return;
+        }
+
+        // 2. Mark pending logs as Approved ONLY IF there are pending logs
+        const hasPendingLogs = activeInspectionLogs.some(l => l.status === 'Pending');
+        if (hasPendingLogs) {
+          const { error: logErr } = await sb.from('tracker_logs')
+            .update({ status: 'Approved' })
+            .eq('username', currentInspectedUser)
+            .eq('status', 'Pending');
+          if (logErr) throw logErr;
+        }
+
+        toast('Payout disbursed successfully!', 'success');
+        closePayoutModal();
+        await loadEmployeeDirectory();
+        await inspectUserLogs(currentInspectedUser);
+      } catch (err) {
+        console.error('Unexpected Payout Error:', err);
+        toast(`Error: ${err.message || 'Could not complete payout settlement.'}`, 'error');
+      } finally {
+        restore();
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AVR R&D · HRMS Portal</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Supabase CDN & Config -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="static/js/config.js"></script>
+  
+  <link rel="stylesheet" href="static/css/styles.css">
+  <style>
+    /* Custom layout styling for Header/Footer integration */
+    .main-site-header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-dark) 100%);
+      color: #fff;
+      padding: 16px 24px;
+      border-bottom: 4px solid var(--amber);
+    }
+    .header-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand-identity {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .company-logo {
+      height: 48px;
+      width: auto;
+      object-fit: contain;
+    }
+    .company-title {
+      color: #fff;
+      font-size: 20px;
+      margin: 0;
+      line-height: 1.2;
+    }
+    .portal-subtext {
+      font-size: 12px;
+      color: #bfcbdc;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+
+    .login-container-wrapper {
+      min-height: calc(100vh - 360px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+    .login-card-custom {
+      max-width: 420px;
+      width: 100%;
+      border-top: 4px solid var(--navy);
+    }
+
+    .main-site-footer {
+      background: var(--navy-dark);
+      color: #e2e8f0;
+      padding: 36px 24px 18px;
+      margin-top: 40px;
+      border-top: 1px solid var(--rule-strong);
+    }
+    .footer-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 32px;
+    }
+    .main-site-footer h4 {
+      color: var(--amber);
+      font-size: 15px;
+      margin-bottom: 10px;
+    }
+    .footer-address {
+      font-style: normal;
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: #cbd5e1;
+    }
+    .footer-contact-list {
+      list-style: none;
+      padding: 0;
+      font-size: 13.5px;
+    }
+    .footer-contact-list li {
+      margin-bottom: 8px;
+    }
+    .footer-contact-list a {
+      color: #93c5fd;
+      text-decoration: none;
+    }
+    .footer-contact-list a:hover {
+      text-decoration: underline;
+    }
+    .footer-bottom {
+      max-width: 1200px;
+      margin: 24px auto 0;
+      padding-top: 16px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.15);
+      text-align: center;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    @media (max-width: 768px) {
+      .footer-container {
+        grid-template-columns: 1fr;
+      }
+      .company-title {
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Dynamic Header Injection Point -->
+  <div id="header-placeholder"></div>
+
+  <!-- Centralized Login Area -->
+  <main class="login-container-wrapper">
+    <div class="card login-card-custom">
+      <div class="login-badge">AVR</div>
+      <h2 style="text-align: center; margin-bottom: 4px;">HRMS Portal Login</h2>
+      <p class="text-muted" style="text-align: center; margin-bottom: 24px;">Unified Access for Admin, Faculty, and Employees</p>
+
+      <form id="unifiedLoginForm">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="loginUsername" required placeholder="Enter username" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="loginPassword" required placeholder="Enter password" autocomplete="current-password">
+        </div>
+        <button type="submit" id="loginBtn" style="width: 100%;">Sign In</button>
+      </form>
+
+      <div id="loginError" class="hidden" style="color: var(--danger); font-size: 13px; text-align: center; margin-top: 14px; font-weight: 600;"></div>
+    </div>
+  </main>
+
+  <!-- Dynamic Footer Injection Point -->
+  <div id="footer-placeholder"></div>
+
+  <div id="globalToast"></div>
+
+  <script>
+    // Component Ingestion (Includes Header and Footer)
+    async function loadLayoutComponents() {
+      try {
+        const [headerRes, footerRes] = await Promise.all([
+          fetch('Indexheader.html'),
+          fetch('Indexfooter.html')
+        ]);
+        if (headerRes.ok) document.getElementById('header-placeholder').innerHTML = await headerRes.text();
+        if (footerRes.ok) document.getElementById('footer-placeholder').innerHTML = await footerRes.text();
+      } catch (err) {
+        console.error('Could not load header/footer templates:', err);
+      }
+    }
+
+    // Unified Login & Role-Based Routing
+    document.getElementById('unifiedLoginForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const user = document.getElementById('loginUsername').value.trim();
+      const pass = document.getElementById('loginPassword').value.trim();
+      const errBox = document.getElementById('loginError');
+      const loginBtn = document.getElementById('loginBtn');
+
+      errBox.classList.add('hidden');
+      const originalText = loginBtn.innerText;
+      loginBtn.disabled = true;
+      loginBtn.innerText = 'Authenticating…';
+
+      try {
+        // Look up account credentials in Supabase
+        const { data, error } = await sb.from('users')
+          .select('*')
+          .ilike('username', user)
+          .eq('password_hash', pass)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (!data) {
+          errBox.textContent = 'Invalid username or password.';
+          errBox.classList.remove('hidden');
+          return;
+        }
+
+        // 1. Approval Status Check
+        if (data.status === 'pending') {
+          errBox.textContent = 'Your account is pending approval.';
+          errBox.classList.remove('hidden');
+          return;
+        }
+
+        if (data.status === 'rejected') {
+          errBox.textContent = 'Account access disabled. Contact admin.';
+          errBox.classList.remove('hidden');
+          return;
+        }
+
+        // 2. Active / Deactivated EMS Status Check
+        if (data.is_active === false) {
+          errBox.textContent = 'Your account has been deactivated. Please contact HR / Admin.';
+          errBox.classList.remove('hidden');
+          return;
+        }
+
+        // Store active session
+        sessionStorage.setItem('session_user', JSON.stringify(data));
+
+        // Route user based on their specific role
+        if (data.role === 'admin') {
+          window.location.href = 'Admin/Adminhome.html';
+        } else if (data.role === 'coordinator' || data.role === 'faculty') {
+          window.location.href = 'Faculty/Facultyhome.html';
+        } else if (data.role === 'user' || data.role === 'employee') {
+          window.location.href = 'Employee/Employeehome.html';
+        } else {
+          errBox.textContent = 'Unknown user role assigned. Contact admin.';
+          errBox.classList.remove('hidden');
+        }
+
+      } catch (err) {
+        console.error('Login error:', err);
+        errBox.textContent = 'Unable to connect to service. Please try again.';
+        errBox.classList.remove('hidden');
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.innerText = originalText;
+      }
+    });
+
+    // Check if user is already logged in
+    window.onload = function() {
+      loadLayoutComponents();
+      const cached = sessionStorage.getItem('session_user');
+      if (cached) {
+        const user = JSON.parse(cached);
+        // Only redirect if active
+        if (user.is_active !== false) {
+          if (user.role === 'admin') window.location.href = 'Admin/Adminhome.html';
+          else if (user.role === 'coordinator' || user.role === 'faculty') window.location.href = 'Faculty/Facultyhome.html';
+          else if (user.role === 'user' || user.role === 'employee') window.location.href = 'Employee/Employeehome.html';
+        } else {
+          sessionStorage.removeItem('session_user');
+        }
+      }
+    };
+  </script>
+</body>
+</html>

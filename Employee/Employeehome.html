@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employee Portal · AVR HRMS</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Supabase CDN & Config -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../static/js/config.js"></script>
+
+  <link rel="stylesheet" href="../static/css/styles.css">
+  <style>
+    .main-site-header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-dark) 100%);
+      color: #fff;
+      padding: 16px 24px;
+      border-bottom: 4px solid var(--amber);
+      margin-bottom: 24px;
+    }
+    .header-container {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .brand-identity { display: flex; align-items: center; gap: 16px; }
+    .company-logo { height: 44px; width: auto; object-fit: contain; }
+    .company-title { color: #fff; font-size: 18px; margin: 0; }
+    .portal-subtext { font-size: 12px; color: #bfcbdc; letter-spacing: .05em; text-transform: uppercase; }
+
+    /* Custom Grid Metric Cards */
+    .emp-metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .emp-metric-card {
+      background: var(--paper-raised, #fffdf8);
+      border: 1px solid var(--rule, #ddd3bd);
+      border-radius: 8px;
+      padding: 18px 20px;
+      border-top: 4px solid var(--navy);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .emp-metric-card:nth-child(2) { border-top-color: var(--teal); }
+    .emp-metric-card:nth-child(3) { border-top-color: var(--amber); }
+    .emp-metric-card:nth-child(4) { border-top-color: var(--navy-dark); }
+
+    .emp-metric-card h3 {
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--ink-soft, #726a5a);
+      margin-bottom: 6px;
+    }
+    .emp-metric-card .metric-val {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--ink, #20241f);
+    }
+
+    /* Attendance Quick Action Card */
+    .attendance-banner-card {
+      background: linear-gradient(135deg, #173252 0%, #0e2138 100%);
+      color: #fff;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      box-shadow: var(--shadow);
+    }
+    .attendance-banner-card h3 { color: #fff; margin-bottom: 4px; font-size: 18px; }
+    .attendance-banner-card p { color: #cbd5e1; font-size: 13px; margin: 0; }
+    .attendance-btn-group { display: flex; gap: 10px; align-items: center; }
+
+    /* Filter Preset Chips */
+    .preset-chips {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .chip-btn {
+      background: var(--paper-raised, #fffdf8);
+      border: 1px solid var(--rule, #ddd3bd);
+      color: var(--navy);
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .chip-btn:hover, .chip-btn.active {
+      background: var(--navy);
+      color: #fff;
+      border-color: var(--navy);
+    }
+
+    /* Projected Pay Banner */
+    .pay-strip {
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--amber-tint); border: 1.5px dashed var(--amber);
+      border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 13px; color: var(--ink-soft);
+    }
+    .pay-strip strong { font-family: 'IBM Plex Mono', monospace; color: var(--teal); font-size: 17px; }
+
+    /* Modal Overlay Styles */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(14, 33, 56, 0.6);
+      display: none; align-items: center; justify-content: center;
+      padding: 16px; z-index: 100;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-card { width: 100%; max-width: 400px; margin: 0; border-top: 4px solid var(--navy); }
+
+    .main-site-footer {
+      background: var(--navy-dark);
+      color: #e2e8f0;
+      padding: 36px 24px 18px;
+      margin-top: 40px;
+      border-top: 1px solid var(--rule-strong);
+    }
+    .footer-container {
+      max-width: 1200px; margin: 0 auto;
+      display: grid; grid-template-columns: 1.4fr 1fr; gap: 32px;
+    }
+    .main-site-footer h4 { color: var(--amber); font-size: 15px; margin-bottom: 10px; }
+    .footer-address { font-style: normal; font-size: 13.5px; line-height: 1.6; color: #cbd5e1; }
+    .footer-contact-list { list-style: none; padding: 0; font-size: 13.5px; }
+    .footer-contact-list li { margin-bottom: 8px; }
+    .footer-contact-list a { color: #93c5fd; text-decoration: none; }
+    .footer-bottom {
+      max-width: 1200px; margin: 24px auto 0; padding-top: 16px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.15); text-align: center; font-size: 12px; color: #94a3b8;
+    }
+
+    /* Helper utility class for hiding element containers */
+    .hidden { display: none !important; }
+
+    @media (max-width: 860px) {
+      .emp-metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 640px) {
+      .emp-metrics-grid { grid-template-columns: 1fr; }
+      .footer-container { grid-template-columns: 1fr; }
+      .attendance-banner-card { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Dynamic Header -->
+  <div id="emp-header-placeholder"></div>
+
+  <main class="container">
+    <h2 style="margin-bottom: 4px;">Welcome back, <span id="userGreeting">-</span></h2>
+    <p class="text-muted" style="margin-bottom: 20px;">Log your daily training sessions, expenses, and track your payout status</p>
+
+    <!-- Stat Metrics Row -->
+    <div class="emp-metrics-grid">
+      <div class="emp-metric-card">
+        <h3>Days Tracked</h3>
+        <div id="mDays" class="metric-val">0</div>
+      </div>
+      <div class="emp-metric-card">
+        <h3>Base Fees Earned</h3>
+        <div id="mBase" class="metric-val">₹0</div>
+      </div>
+      <div class="emp-metric-card">
+        <h3>Reimbursed Expenses</h3>
+        <div id="mExp" class="metric-val">₹0</div>
+      </div>
+      <div class="emp-metric-card">
+        <h3>Gross Take-Home</h3>
+        <div id="mGross" class="metric-val">₹0</div>
+      </div>
+    </div>
+
+    <div class="two-col" style="grid-template-columns: 1fr 1.6fr; margin-top: 20px;">
+      <!-- Log Submission Form -->
+      <div class="card" id="logFormCard">
+        <h3>Submit Daily Field Log / Attendance</h3>
+        <form id="trackerForm" style="margin-top:16px;">
+          <div class="form-group">
+            <label>Attendance Date</label>
+            <input type="date" id="logDate" required>
+          </div>
+          <div class="form-group">
+            <label>College Name</label>
+            <select id="logCollege" required onchange="populateDeptAndSections()">
+              <option value="">Select College</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Department & Assigned Section</label>
+            <select id="logSection" required>
+              <option value="">Select College First</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Day Type Status</label>
+            <select id="logDayType" onchange="calculateProjectedPay()">
+              <option value="Full Day">Full Day Attendance</option>
+              <option value="Half Day">Half Day Attendance</option>
+              <option value="Canceled">Session Canceled</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Description / Concepts Covered</label>
+            <textarea id="logDesc" rows="3" required placeholder="What concepts were introduced or completed today?"></textarea>
+          </div>
+
+          <!-- Dynamic Expense Permission Container Fields -->
+          <div class="form-group" id="travelExpenseGroup">
+            <label>Travel Expenses (₹)</label>
+            <input type="number" id="logTravel" value="0" min="0" oninput="calculateProjectedPay()">
+          </div>
+          <div class="form-group" id="foodExpenseGroup">
+            <label>Food Expenses (₹)</label>
+            <input type="number" id="logFood" value="0" min="0" oninput="calculateProjectedPay()">
+          </div>
+
+          <div class="pay-strip">
+            <span>Projected Gross Pay</span>
+            <strong id="projectedCalculation">₹0</strong>
+          </div>
+
+          <button type="submit" id="addLogBtn" style="width:100%;">Mark Attendance & Save Entry</button>
+        </form>
+      </div>
+
+      <!-- Log Matrix Table with Advanced Duration Filters -->
+      <div class="card">
+        <div class="flex-space" style="margin-bottom:10px; align-items:flex-end;">
+          <h3 style="margin-bottom:0;">Attendance & Log History</h3>
+        </div>
+
+        <!-- Filter Presets (Monthly, Quarterly, Half-Yearly, Custom) -->
+        <div class="preset-chips">
+          <button class="chip-btn active" onclick="setFilterPreset('monthly', this)">This Month</button>
+          <button class="chip-btn" onclick="setFilterPreset('quarterly', this)">Quarterly (3 Mo)</button>
+          <button class="chip-btn" onclick="setFilterPreset('halfyearly', this)">Half-Yearly (6 Mo)</button>
+          <button class="chip-btn" onclick="setFilterPreset('all', this)">All Time</button>
+        </div>
+
+        <!-- Date Range Controls -->
+        <div style="display:flex; gap:10px; margin-bottom:16px; align-items:center; flex-wrap:wrap;">
+          <div class="form-group" style="margin-bottom:0; flex:1; min-width:130px;">
+            <label>Start Date</label>
+            <input type="date" id="filterStartDate" onchange="applyCustomFilter()">
+          </div>
+          <div class="form-group" style="margin-bottom:0; flex:1; min-width:130px;">
+            <label>End Date</label>
+            <input type="date" id="filterEndDate" onchange="applyCustomFilter()">
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table id="userTrackerTable">
+            <thead>
+              <tr>
+                <th>Date / Time</th>
+                <th>College / Section</th>
+                <th>Type</th>
+                <th>Reimbursements</th>
+                <th>Gross</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Change Password Modal -->
+  <div class="modal-overlay" id="passwordModal">
+    <div class="card modal-card">
+      <h3>Update Credentials</h3>
+      <p class="text-muted" style="margin-top:2px;">Change your account password key</p>
+
+      <form id="passwordForm" style="margin-top:16px;">
+        <div class="form-group">
+          <label>New Password</label>
+          <input type="password" id="updatedPassword" required placeholder="Enter new password">
+        </div>
+        <div class="flex-space" style="margin-top:20px; margin-bottom:0;">
+          <button type="submit" id="pwSaveBtn">Save Updates</button>
+          <button type="button" onclick="closePasswordModal()" class="secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Dynamic Footer -->
+  <div id="emp-footer-placeholder"></div>
+
+  <div id="globalToast"></div>
+
+  <script>
+    let state = {
+      currentUser: null,
+      collegeRows: [],
+      collegeMap: {},
+      logs: []
+    };
+
+    function up(val) { return (val || '').toString().toUpperCase(); }
+
+    let toastTimer;
+    function toast(msg, type) {
+      const el = document.getElementById('globalToast');
+      el.textContent = msg;
+      el.className = 'show' + (type ? ' ' + type : '');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+    }
+
+    function withLoading(btn, label) {
+      const original = btn.innerText;
+      btn.disabled = true;
+      btn.innerText = label || 'Working…';
+      return () => { btn.disabled = false; btn.innerText = original; };
+    }
+
+    function logout() {
+      sessionStorage.removeItem('session_user');
+      window.location.href = '../index.html';
+    }
+
+    function scrollToLogForm() {
+      document.getElementById('logFormCard').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    (async function init() {
+      const cached = sessionStorage.getItem('session_user');
+      if (!cached) { window.location.href = '../index.html'; return; }
+      const user = JSON.parse(cached);
+      if (user.role !== 'employee' && user.role !== 'user') { window.location.href = '../index.html'; return; }
+      state.currentUser = user;
+
+      // Set default date to today
+      document.getElementById('logDate').value = new Date().toISOString().split('T')[0];
+
+      try {
+        const [hRes, fRes] = await Promise.all([
+          fetch('Employeeheader.html'),
+          fetch('Employeefooter.html')
+        ]);
+        if (hRes.ok) document.getElementById('emp-header-placeholder').innerHTML = await hRes.text();
+        if (fRes.ok) document.getElementById('emp-footer-placeholder').innerHTML = await fRes.text();
+      } catch (err) { console.error('Failed loading layout components', err); }
+
+      document.getElementById('userGreeting').innerText = state.currentUser.username;
+      document.getElementById('trackerForm').addEventListener('submit', handleAddLog);
+      document.getElementById('passwordForm').addEventListener('submit', commitPasswordChange);
+
+      // Apply Dynamic Expense Permissions Check
+      applyExpensePermissions();
+
+      calculateProjectedPay();
+      await loadCollegeDirectory();
+      await fetchLogsAndRender();
+      setFilterPreset('monthly');
+    })();
+
+    /* Enforce Travel/Food Expense UI Visibility based on Admin Privileges */
+    function applyExpensePermissions() {
+      if (!state.currentUser) return;
+
+      const allowTravel = !!state.currentUser.allow_travel_expense;
+      const allowFood = !!state.currentUser.allow_food_expense;
+
+      const travelGrp = document.getElementById('travelExpenseGroup');
+      const foodGrp = document.getElementById('foodExpenseGroup');
+
+      if (!allowTravel) {
+        travelGrp.classList.add('hidden');
+        document.getElementById('logTravel').value = "0";
+      } else {
+        travelGrp.classList.remove('hidden');
+      }
+
+      if (!allowFood) {
+        foodGrp.classList.add('hidden');
+        document.getElementById('logFood').value = "0";
+      } else {
+        foodGrp.classList.remove('hidden');
+      }
+    }
+
+    async function loadCollegeDirectory() {
+      try {
+        const { data, error } = await sb.from('college_sections').select('*').order('college_name');
+        if (error) throw error;
+        state.collegeRows = data || [];
+
+        state.collegeMap = {};
+        state.collegeRows.forEach(row => {
+          if (!state.collegeMap[row.college_name]) state.collegeMap[row.college_name] = [];
+          state.collegeMap[row.college_name].push(row);
+        });
+
+        populateCollegeSelect();
+      } catch (err) { console.error('Error loading colleges', err); }
+    }
+
+    function populateCollegeSelect() {
+      const select = document.getElementById('logCollege');
+      const colleges = Object.keys(state.collegeMap).sort();
+      select.innerHTML = '<option value="">Select College</option>' +
+        colleges.map(c => `<option value="${c}">${up(c)}</option>`).join('');
+      populateDeptAndSections();
+    }
+
+    function populateDeptAndSections() {
+      const college = document.getElementById('logCollege').value;
+      const select = document.getElementById('logSection');
+      const rows = state.collegeMap[college] || [];
+
+      if (!college) {
+        select.innerHTML = '<option value="">Select College First</option>';
+        return;
+      }
+
+      if (rows.length === 0) {
+        select.innerHTML = '<option value="">No classes found</option>';
+        return;
+      }
+
+      let optionsHTML = '<option value="">Select Section</option>';
+
+      rows.forEach(r => {
+        const dept = up(r.department || 'GEN');
+        const year = r.academic_year || '1st Yr';
+        
+        // Parse comma-separated section names (e.g. "CSE-A, CSE-B, CSE-C")
+        const sectionList = (r.section_name || '').split(',').map(s => s.trim()).filter(Boolean);
+
+        sectionList.forEach(sec => {
+          const displayLabel = `${dept} - ${year} (${up(sec)})`;
+          optionsHTML += `<option value="${up(sec)}">${displayLabel}</option>`;
+        });
+      });
+
+      select.innerHTML = optionsHTML;
+    }
+
+    function calculateProjectedPay() {
+      if (!state.currentUser) return;
+      const rate = Number(state.currentUser.default_rate || 0);
+      const type = document.getElementById('logDayType').value;
+
+      const allowTravel = !!state.currentUser.allow_travel_expense;
+      const allowFood = !!state.currentUser.allow_food_expense;
+
+      const travel = allowTravel ? (parseFloat(document.getElementById('logTravel').value) || 0) : 0;
+      const food = allowFood ? (parseFloat(document.getElementById('logFood').value) || 0) : 0;
+
+      let base = 0;
+      if (type === 'Full Day') base = rate;
+      if (type === 'Half Day') base = rate / 2;
+      if (type === 'Canceled') base = 0;
+
+      const total = base + travel + food;
+      document.getElementById('projectedCalculation').innerText = "₹" + total.toLocaleString('en-IN');
+    }
+
+    async function handleAddLog(e) {
+      e.preventDefault();
+      const restore = withLoading(document.getElementById('addLogBtn'), 'Saving…');
+
+      try {
+        const allowTravel = !!state.currentUser.allow_travel_expense;
+        const allowFood = !!state.currentUser.allow_food_expense;
+
+        const travel = allowTravel ? (parseFloat(document.getElementById('logTravel').value) || 0) : 0;
+        const food = allowFood ? (parseFloat(document.getElementById('logFood').value) || 0) : 0;
+        const type = document.getElementById('logDayType').value;
+        const rate = Number(state.currentUser.default_rate || 0);
+
+        let base = 0;
+        if (type === 'Full Day') base = rate;
+        if (type === 'Half Day') base = rate / 2;
+        if (type === 'Canceled') base = 0;
+
+        const newLog = {
+          username: state.currentUser.username,
+          date: document.getElementById('logDate').value,
+          college_name: document.getElementById('logCollege').value,
+          section: document.getElementById('logSection').value,
+          day_type: type,
+          description: document.getElementById('logDesc').value,
+          base_pay: base,
+          travel_expense: travel,
+          food_expense: food,
+          gross_earnings: base + travel + food,
+          status: "Pending"
+        };
+
+        const { error } = await sb.from('tracker_logs').insert(newLog);
+        if (error) throw error;
+
+        document.getElementById('logDesc').value = "";
+        document.getElementById('logTravel').value = "0";
+        document.getElementById('logFood').value = "0";
+
+        calculateProjectedPay();
+        await fetchLogsAndRender();
+        toast('Attendance entry committed successfully.', 'success');
+      } catch (err) {
+        console.error(err);
+        toast('Could not save attendance log.', 'error');
+      } finally {
+        restore();
+      }
+    }
+
+    async function fetchLogsAndRender() {
+      try {
+        const { data, error } = await sb.from('tracker_logs')
+          .select('*')
+          .eq('username', state.currentUser.username)
+          .order('date', { ascending: false });
+
+        if (error) throw error;
+        state.logs = data || [];
+        renderFilteredLogs();
+      } catch (err) {
+        console.error('Failed fetching logs', err);
+      }
+    }
+
+    function setFilterPreset(type, btnElement) {
+      if (btnElement) {
+        document.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
+        btnElement.classList.add('active');
+      }
+
+      const today = new Date();
+      const startInput = document.getElementById('filterStartDate');
+      const endInput = document.getElementById('filterEndDate');
+
+      endInput.value = today.toISOString().split('T')[0];
+
+      if (type === 'monthly') {
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        startInput.value = firstDay.toISOString().split('T')[0];
+      } else if (type === 'quarterly') {
+        const qDay = new Date();
+        qDay.setMonth(qDay.getMonth() - 3);
+        startInput.value = qDay.toISOString().split('T')[0];
+      } else if (type === 'halfyearly') {
+        const hDay = new Date();
+        hDay.setMonth(hDay.getMonth() - 6);
+        startInput.value = hDay.toISOString().split('T')[0];
+      } else {
+        startInput.value = '';
+        endInput.value = '';
+      }
+
+      renderFilteredLogs();
+    }
+
+    function applyCustomFilter() {
+      document.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
+      renderFilteredLogs();
+    }
+
+    function renderFilteredLogs() {
+      const tbody = document.querySelector('#userTrackerTable tbody');
+      const sDate = document.getElementById('filterStartDate').value;
+      const eDate = document.getElementById('filterEndDate').value;
+
+      let filtered = state.logs.filter(l => {
+        if (sDate && l.date < sDate) return false;
+        if (eDate && l.date > eDate) return false;
+        return true;
+      });
+
+      tbody.innerHTML = "";
+      let metrics = { days: 0, base: 0, exp: 0, gross: 0 };
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No attendance records found for this period.</td></tr>`;
+      }
+
+      filtered.forEach(log => {
+        metrics.days += log.day_type !== 'Canceled' ? (log.day_type === 'Full Day' ? 1 : 0.5) : 0;
+        metrics.base += Number(log.base_pay || 0);
+        metrics.exp += (Number(log.travel_expense || 0) + Number(log.food_expense || 0));
+        metrics.gross += Number(log.gross_earnings || 0);
+
+        const createdTime = log.created_at ? new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td data-label="Date / Time" class="mono">
+            <b>${log.date}</b><br>
+            <small class="text-muted">${createdTime}</small>
+          </td>
+          <td data-label="College / Section"><b>${up(log.college_name)}</b><br><small class="text-muted">${up(log.section)}</small></td>
+          <td data-label="Type">${log.day_type}</td>
+          <td data-label="Reimbursements" class="mono">T: ₹${log.travel_expense || 0} · F: ₹${log.food_expense || 0}</td>
+          <td data-label="Gross" class="mono" style="color:var(--teal); font-weight:700;">₹${log.gross_earnings}</td>
+          <td data-label="Status">${statusMarkup(log.status)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('mDays').innerText = metrics.days;
+      document.getElementById('mBase').innerText = "₹" + metrics.base.toLocaleString('en-IN');
+      document.getElementById('mExp').innerText = "₹" + metrics.exp.toLocaleString('en-IN');
+      document.getElementById('mGross').innerText = "₹" + metrics.gross.toLocaleString('en-IN');
+    }
+
+    function statusMarkup(status) {
+      return status === 'Approved'
+        ? `<span class="status-tag status-approved">Approved</span>`
+        : `<span class="status-tag status-pending">Pending</span>`;
+    }
+
+    function openPasswordModal() { document.getElementById('passwordModal').classList.add('active'); }
+    function closePasswordModal() { document.getElementById('passwordModal').classList.remove('active'); }
+
+    async function commitPasswordChange(e) {
+      e.preventDefault();
+      const newPass = document.getElementById('updatedPassword').value;
+      if (!newPass) return;
+
+      const restore = withLoading(document.getElementById('pwSaveBtn'), 'Saving…');
+      try {
+        const { error } = await sb.from('users').update({ password_hash: newPass }).eq('username', state.currentUser.username);
+        if (error) throw error;
+
+        state.currentUser.password_hash = newPass;
+        sessionStorage.setItem('session_user', JSON.stringify(state.currentUser));
+        toast('Password updated successfully.', 'success');
+        document.getElementById('passwordForm').reset();
+        closePasswordModal();
+      } catch (err) {
+        console.error(err);
+        toast('Could not update password.', 'error');
+      } finally {
+        restore();
+      }
+    }
+  </script>
+</body>
+</html>

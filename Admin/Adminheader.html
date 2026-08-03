@@ -1,0 +1,56 @@
+<!-- Admin/Adminheader.html -->
+ <style>
+    .admin-sub-nav {
+        background: var(--navy-dark);
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        margin-top: 12px;
+        padding: 8px 0;
+      }
+      .sub-nav-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        display: flex;
+        gap: 20px;
+        padding: 0 24px;
+      }
+      .sub-nav-link {
+        color: #cbd5e1;
+        text-decoration: none;
+        font-size: 13.5px;
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+      }
+      .sub-nav-link:hover, .sub-nav-link.active {
+        color: #fff;
+        background: var(--navy);
+      }
+ </style>
+<header class="main-site-header">
+  <div class="header-container">
+    <div class="brand-identity">
+      <img src="../static/img/avr_logo.png" alt="AVR Logo" class="company-logo" onerror="this.style.display='none'">
+      <div class="brand-text">
+        <h1 class="company-title">AVR Research and Development Private Limited</h1>
+        <span class="portal-subtext">HRMS · Admin Command Center</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button onclick="logout()" class="secondary" style="color: #fff; border-color: rgba(255,255,255,0.4);">System Logout</button>
+    </div>
+  </div>
+  
+  
+  <!-- Secondary Navigation Sub-Header -->
+  <nav class="admin-sub-nav">
+    <div class="sub-nav-container">
+      <a href="Adminhome.html" id="nav-dashboard" class="sub-nav-link">Dashboard</a>
+      <a href="collegeboard.html" id="nav-colleges" class="sub-nav-link">Colleges</a>
+      <a href="facultyboard.html" id="nav-faculty" class="sub-nav-link">Faculty / Coordinators</a>
+      <a href="employeeboard.html" id="nav-employees" class="sub-nav-link">Employees / Trainers</a>
+      <a href="employemanagementeboard.html" id="nav-employeesmanagement" class="sub-nav-link">EMS</a>
+      <a href="payoutboard.html" id="nav-payouts" class="sub-nav-link">Payout Logs</a>
+    </div>
+  </nav>
+</header>

@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Faculty Management · AVR HRMS Admin</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Supabase CDN & Config -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../static/js/config.js"></script>
+
+  <link rel="stylesheet" href="../static/css/styles.css">
+  <style>
+    .main-site-header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-dark) 100%);
+      color: #fff;
+      padding: 16px 24px 0;
+      border-bottom: 4px solid var(--amber);
+      margin-bottom: 24px;
+    }
+    .header-container {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .brand-identity { display: flex; align-items: center; gap: 16px; }
+    .company-logo { height: 44px; width: auto; object-fit: contain; }
+    .company-title { color: #fff; font-size: 18px; margin: 0; }
+    .portal-subtext { font-size: 12px; color: #bfcbdc; letter-spacing: .05em; text-transform: uppercase; }
+
+    /* Modal Overlay Styles */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(14, 33, 56, 0.6);
+      display: none; align-items: center; justify-content: center;
+      padding: 16px; z-index: 100;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-card { width: 100%; max-width: 480px; margin: 0; border-top: 4px solid var(--navy); }
+
+    .main-site-footer {
+      background: var(--navy-dark);
+      color: #e2e8f0;
+      padding: 36px 24px 18px;
+      margin-top: 40px;
+      border-top: 1px solid var(--rule-strong);
+    }
+    .footer-container {
+      max-width: 1200px; margin: 0 auto;
+      display: grid; grid-template-columns: 1.4fr 1fr; gap: 32px;
+    }
+    .main-site-footer h4 { color: var(--amber); font-size: 15px; margin-bottom: 10px; }
+    .footer-address { font-style: normal; font-size: 13.5px; line-height: 1.6; color: #cbd5e1; }
+    .footer-contact-list { list-style: none; padding: 0; font-size: 13.5px; }
+    .footer-contact-list li { margin-bottom: 8px; }
+    .footer-contact-list a { color: #93c5fd; text-decoration: none; }
+    .footer-bottom {
+      max-width: 1200px; margin: 24px auto 0; padding-top: 16px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.15); text-align: center; font-size: 12px; color: #94a3b8;
+    }
+
+    @media (max-width: 768px) { .footer-container { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+  <!-- Dynamic Header -->
+  <div id="admin-header-placeholder"></div>
+
+  <main class="container">
+    <h2 style="margin-bottom: 6px;">Faculty & Coordinator Management</h2>
+    <p class="text-muted" style="margin-bottom: 20px;">Provision faculty accounts, manage contact details, and assign class oversight</p>
+
+    <div class="two-col">
+      <!-- Create Faculty Account & Assignment Form -->
+      <div>
+        <div class="card">
+          <h3>Add Faculty Account</h3>
+          <form id="createFacultyForm" style="margin-top:16px;">
+            <div class="form-group">
+              <label>Faculty Username</label>
+              <input type="text" id="facultyUsername" required placeholder="e.g. dr_smith">
+            </div>
+            <div class="form-group">
+              <label>Password</label>
+              <input type="password" id="facultyPassword" required placeholder="Temporary password">
+            </div>
+            <div class="form-group">
+              <label>Contact Phone Number</label>
+              <input type="tel" id="facultyPhone" required placeholder="+91 9876543210">
+            </div>
+            <button type="submit" id="createFacultyBtn" style="width: 100%;">Create Faculty Account</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>Assign Classes to Faculty</h3>
+          <div class="form-group" style="margin-top:12px;">
+            <label>Select Faculty</label>
+            <select id="assignFacultySelect" onchange="renderAssignChecklist()">
+              <option value="">Select Faculty</option>
+            </select>
+          </div>
+          <div id="assignChecklistWrap" class="hidden">
+            <label>Tick class sections assigned to this faculty:</label>
+            <div id="assignChecklist" class="checklist-box"></div>
+            <button type="button" id="saveAssignmentsBtn" onclick="saveAssignments()" style="margin-top:12px; width:100%;">Save Class Assignments</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Faculty List & Existing Assignments -->
+      <div>
+        <div class="card">
+          <h3>Faculty Directory</h3>
+          <div class="table-wrap">
+            <table id="facultyTable">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Contact</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Assigned Classes Matrix</h3>
+          <div class="table-wrap">
+            <table id="assignmentsTable">
+              <thead>
+                <tr>
+                  <th>Faculty</th>
+                  <th>College / Dept</th>
+                  <th>Year / Section</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Edit Faculty Modal -->
+  <div class="modal-overlay" id="editFacultyModal">
+    <div class="card modal-card">
+      <h3>Edit Faculty Account</h3>
+      <p class="text-muted" style="margin-top:2px;">Update profile details for <strong id="editFacultyTarget">-</strong></p>
+
+      <form id="editFacultyForm" style="margin-top:16px;">
+        <input type="hidden" id="editFacultyUsername">
+        <div class="form-group">
+          <label>Contact Phone Number</label>
+          <input type="tel" id="editFacultyPhone" required>
+        </div>
+        <div class="form-group">
+          <label>New Passphrase (leave blank to keep unchanged)</label>
+          <input type="password" id="editFacultyPass" placeholder="Enter new password">
+        </div>
+
+        <div class="flex-space" style="margin-top:20px; margin-bottom:0;">
+          <button type="submit" id="saveFacultyEditBtn">Save Changes</button>
+          <button type="button" onclick="closeFacultyModal()" class="secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Dynamic Footer -->
+  <div id="admin-footer-placeholder"></div>
+
+  <div id="globalToast"></div>
+
+  <script>
+    let state = {
+      facultyList: [],
+      assignments: [],
+      collegeRows: []
+    };
+
+    function up(val) { return (val || '').toString().toUpperCase(); }
+
+    let toastTimer;
+    function toast(msg, type) {
+      const el = document.getElementById('globalToast');
+      el.textContent = msg;
+      el.className = 'show' + (type ? ' ' + type : '');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+    }
+
+    function withLoading(btn, label) {
+      const original = btn.innerText;
+      btn.disabled = true;
+      btn.innerText = label || 'Working…';
+      return () => { btn.disabled = false; btn.innerText = original; };
+    }
+
+    function logout() {
+      sessionStorage.removeItem('session_user');
+      window.location.href = '../index.html';
+    }
+
+    (async function init() {
+      const cached = sessionStorage.getItem('session_user');
+      if (!cached) { window.location.href = '../index.html'; return; }
+      const user = JSON.parse(cached);
+      if (user.role !== 'admin') { window.location.href = '../index.html'; return; }
+
+      try {
+        const [hRes, fRes] = await Promise.all([
+          fetch('Adminheader.html'),
+          fetch('Adminfooter.html')
+        ]);
+        if (hRes.ok) {
+          document.getElementById('admin-header-placeholder').innerHTML = await hRes.text();
+          const activeLink = document.getElementById('nav-faculty');
+          if (activeLink) activeLink.classList.add('active');
+        }
+        if (fRes.ok) document.getElementById('admin-footer-placeholder').innerHTML = await fRes.text();
+      } catch (err) { console.error('Failed loading layout components', err); }
+
+      document.getElementById('createFacultyForm').addEventListener('submit', handleCreateFaculty);
+      document.getElementById('editFacultyForm').addEventListener('submit', handleSaveFacultyEdit);
+
+      await loadAllData();
+    })();
+
+    async function loadAllData() {
+      await Promise.all([
+        loadFacultyDirectory(),
+        loadCollegeSections(),
+        loadAssignments()
+      ]);
+    }
+
+    async function loadFacultyDirectory() {
+      const tbody = document.querySelector('#facultyTable tbody');
+      tbody.innerHTML = `<tr><td colspan="3" class="empty-state">Loading faculty…</td></tr>`;
+
+      try {
+        const { data, error } = await sb.from('users')
+          .select('*')
+          .or('role.eq.coordinator,role.eq.faculty')
+          .order('username');
+
+        if (error) throw error;
+        state.facultyList = data || [];
+
+        // Populate dropdown
+        const select = document.getElementById('assignFacultySelect');
+        const prev = select.value;
+        select.innerHTML = '<option value="">Select Faculty</option>' +
+          state.facultyList.map(f => `<option value="${f.username}">${f.username}</option>`).join('');
+        if (prev) select.value = prev;
+
+        renderFacultyTable();
+      } catch (err) {
+        console.error(err);
+        tbody.innerHTML = `<tr><td colspan="3" class="empty-state">Could not load faculty directory.</td></tr>`;
+      }
+    }
+
+    function renderFacultyTable() {
+      const tbody = document.querySelector('#facultyTable tbody');
+      if (state.facultyList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" class="empty-state">No faculty accounts created yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      state.facultyList.forEach(f => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td data-label="Username"><b>${f.username}</b></td>
+          <td data-label="Contact" class="mono">${f.phone_number || '-'}</td>
+          <td data-label="Action">
+            <button class="secondary" style="padding: 6px 12px; font-size: 12px;" onclick="openEditFacultyModal('${f.username}')">Edit</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function handleCreateFaculty(e) {
+      e.preventDefault();
+      const restore = withLoading(document.getElementById('createFacultyBtn'), 'Creating…');
+
+      const user = document.getElementById('facultyUsername').value.trim();
+      const pass = document.getElementById('facultyPassword').value.trim();
+      const phone = document.getElementById('facultyPhone').value.trim();
+
+      try {
+        const { data: existing } = await sb.from('users').select('username').ilike('username', user).maybeSingle();
+        if (existing) { toast('Username already taken.', 'error'); return; }
+
+        const { error } = await sb.from('users').insert({
+          username: user,
+          password_hash: pass,
+          phone_number: phone,
+          role: 'faculty',
+          default_rate: 0,
+          status: 'approved'
+        });
+
+        if (error) throw error;
+
+        document.getElementById('createFacultyForm').reset();
+        toast('Faculty account created.', 'success');
+        await loadFacultyDirectory();
+      } catch (err) {
+        console.error(err);
+        toast('Could not create account.', 'error');
+      } finally {
+        restore();
+      }
+    }
+
+    function openEditFacultyModal(username) {
+      const item = state.facultyList.find(f => f.username === username);
+      if (!item) return;
+
+      document.getElementById('editFacultyTarget').innerText = item.username;
+      document.getElementById('editFacultyUsername').value = item.username;
+      document.getElementById('editFacultyPhone').value = item.phone_number || '';
+      document.getElementById('editFacultyPass').value = '';
+
+      document.getElementById('editFacultyModal').classList.add('active');
+    }
+
+    function closeFacultyModal() {
+      document.getElementById('editFacultyModal').classList.remove('active');
+    }
+
+    async function handleSaveFacultyEdit(e) {
+      e.preventDefault();
+      const username = document.getElementById('editFacultyUsername').value;
+      const phone = document.getElementById('editFacultyPhone').value.trim();
+      const newPass = document.getElementById('editFacultyPass').value.trim();
+
+      const restore = withLoading(document.getElementById('saveFacultyEditBtn'), 'Saving…');
+
+      const updatePayload = { phone_number: phone };
+      if (newPass) updatePayload.password_hash = newPass;
+
+      try {
+        const { error } = await sb.from('users').update(updatePayload).eq('username', username);
+        if (error) throw error;
+
+        toast('Faculty record updated.', 'success');
+        closeFacultyModal();
+        await loadFacultyDirectory();
+      } catch (err) {
+        console.error(err);
+        toast('Could not update profile.', 'error');
+      } finally {
+        restore();
+      }
+    }
+
+    async function loadCollegeSections() {
+      try {
+        const { data, error } = await sb.from('college_sections').select('*').order('college_name');
+        if (error) throw error;
+        state.collegeRows = data || [];
+        renderAssignChecklist();
+      } catch (err) { console.error('Error loading sections', err); }
+    }
+
+    async function loadAssignments() {
+      const tbody = document.querySelector('#assignmentsTable tbody');
+      try {
+        const { data, error } = await sb.from('coordinator_assignments').select('*').order('coordinator_username');
+        if (error) throw error;
+        state.assignments = data || [];
+        renderAssignmentsTable();
+      } catch (err) {
+        console.error(err);
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Could not load assignments.</td></tr>`;
+      }
+    }
+
+    function renderAssignmentsTable() {
+      const tbody = document.querySelector('#assignmentsTable tbody');
+      if (state.assignments.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-state">No class assignments saved yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      state.assignments.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td data-label="Faculty"><b>${row.coordinator_username}</b></td>
+          <td data-label="College / Dept">${up(row.college_name)} <br><small class="text-muted">${up(row.department || '-')}</small></td>
+          <td data-label="Year / Section">${row.academic_year || '-'} (${up(row.section_name)})</td>
+          <td data-label="Action">
+            <button class="danger" style="padding: 6px 12px; font-size: 12px;" onclick="deleteAssignment(${row.id})">Remove</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderAssignChecklist() {
+      const faculty = document.getElementById('assignFacultySelect').value;
+      const wrap = document.getElementById('assignChecklistWrap');
+      const box = document.getElementById('assignChecklist');
+
+      if (!faculty) { wrap.classList.add('hidden'); return; }
+      wrap.classList.remove('hidden');
+
+      if (state.collegeRows.length === 0) {
+        box.innerHTML = `<div class="checklist-empty">No colleges/sections found in directory. Add them in Colleges board first.</div>`;
+        return;
+      }
+
+      const assignedSet = new Set(
+        state.assignments.filter(a => a.coordinator_username === faculty)
+          .map(a => a.college_name + '|||' + (a.department || '') + '|||' + a.section_name)
+      );
+
+      box.innerHTML = state.collegeRows.map(item => {
+        const key = item.college_name + '|||' + (item.department || '') + '|||' + item.section_name;
+        const checked = assignedSet.has(key) ? 'checked' : '';
+        const inputId = 'chk_' + item.id;
+
+        return `
+          <div class="checklist-item">
+            <input type="checkbox" id="${inputId}" value="${key}" ${checked}>
+            <label for="${inputId}">
+              <strong>${up(item.college_name)}</strong> — ${up(item.department || 'GENERAL')} (${item.academic_year || '1st Yr'} - ${up(item.section_name)})
+            </label>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function saveAssignments() {
+      const faculty = document.getElementById('assignFacultySelect').value;
+      if (!faculty) return;
+      const restore = withLoading(document.getElementById('saveAssignmentsBtn'), 'Saving…');
+
+      const checkedKeys = [...document.querySelectorAll('#assignChecklist input[type="checkbox"]:checked')].map(cb => cb.value);
+      const currentlyAssigned = state.assignments.filter(a => a.coordinator_username === faculty);
+      const currentKeySet = new Set(currentlyAssigned.map(a => a.college_name + '|||' + (a.department || '') + '|||' + a.section_name));
+      const checkedKeySet = new Set(checkedKeys);
+
+      const toAdd = checkedKeys.filter(k => !currentKeySet.has(k)).map(k => {
+        const [college_name, department, section_name] = k.split('|||');
+        return { coordinator_username: faculty, college_name, department, section_name };
+      });
+
+      const toRemove = currentlyAssigned.filter(a => !checkedKeySet.has(a.college_name + '|||' + (a.department || '') + '|||' + a.section_name));
+
+      try {
+        if (toAdd.length > 0) {
+          const { error } = await sb.from('coordinator_assignments').insert(toAdd);
+          if (error) throw error;
+        }
+        for (const row of toRemove) {
+          const { error } = await sb.from('coordinator_assignments').delete().eq('id', row.id);
+          if (error) throw error;
+        }
+
+        toast('Assignments updated successfully.', 'success');
+        await loadAssignments();
+      } catch (err) {
+        console.error(err);
+        toast('Could not save assignments.', 'error');
+      } finally {
+        restore();
+      }
+    }
+
+    async function deleteAssignment(id) {
+      try {
+        const { error } = await sb.from('coordinator_assignments').delete().eq('id', id);
+        if (error) throw error;
+        toast('Assignment removed.', 'success');
+        await loadAssignments();
+      } catch (err) {
+        console.error(err);
+        toast('Could not remove assignment.', 'error');
+      }
+    }
+  </script>
+</body>
+</html>

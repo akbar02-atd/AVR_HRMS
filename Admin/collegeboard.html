@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>College Directory · AVR HRMS Admin</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Supabase CDN & Config -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../static/js/config.js"></script>
+
+  <link rel="stylesheet" href="../static/css/styles.css">
+  <style>
+    .main-site-header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-dark) 100%);
+      color: #fff;
+      padding: 16px 24px 0;
+      border-bottom: 4px solid var(--amber);
+      margin-bottom: 24px;
+    }
+    .header-container {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .brand-identity { display: flex; align-items: center; gap: 16px; }
+    .company-logo { height: 44px; width: auto; object-fit: contain; }
+    .company-title { color: #fff; font-size: 18px; margin: 0; }
+    .portal-subtext { font-size: 12px; color: #bfcbdc; letter-spacing: .05em; text-transform: uppercase; }
+
+    /* Modal Styles for Editing */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(14, 33, 56, 0.6);
+      display: none; align-items: center; justify-content: center;
+      padding: 16px; z-index: 100;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-card { width: 100%; max-width: 480px; margin: 0; border-top: 4px solid var(--navy); }
+
+    .main-site-footer {
+      background: var(--navy-dark);
+      color: #e2e8f0;
+      padding: 36px 24px 18px;
+      margin-top: 40px;
+      border-top: 1px solid var(--rule-strong);
+    }
+    .footer-container {
+      max-width: 1200px; margin: 0 auto;
+      display: grid; grid-template-columns: 1.4fr 1fr; gap: 32px;
+    }
+    .main-site-footer h4 { color: var(--amber); font-size: 15px; margin-bottom: 10px; }
+    .footer-address { font-style: normal; font-size: 13.5px; line-height: 1.6; color: #cbd5e1; }
+    .footer-contact-list { list-style: none; padding: 0; font-size: 13.5px; }
+    .footer-contact-list li { margin-bottom: 8px; }
+    .footer-contact-list a { color: #93c5fd; text-decoration: none; }
+    .footer-bottom {
+      max-width: 1200px; margin: 24px auto 0; padding-top: 16px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.15); text-align: center; font-size: 12px; color: #94a3b8;
+    }
+
+    @media (max-width: 768px) { .footer-container { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+  <!-- Dynamic Header -->
+  <div id="admin-header-placeholder"></div>
+
+  <main class="container">
+    <h2 style="margin-bottom: 6px;">College & Section Management</h2>
+    <p class="text-muted" style="margin-bottom: 20px;">Configure colleges, departments, academic years, and class sections</p>
+
+    <div class="two-col">
+      <!-- Add College / Section Form -->
+      <div class="card">
+        <h3>Add College Class Entry</h3>
+        <p class="text-muted" style="margin-top:4px;">Define a new class mapping for training daily logs.</p>
+        
+        <form id="addCollegeSectionForm" style="margin-top:16px;">
+          <div class="form-group">
+            <label>College Name</label>
+            <input type="text" id="addCollegeName" required placeholder="e.g. VNR VJIET" style="text-transform:uppercase;">
+          </div>
+          <div class="form-group">
+            <label>Department</label>
+            <input type="text" id="addDepartment" required placeholder="e.g. CSE, ECE, AI/ML, CIVIL" style="text-transform:uppercase;">
+          </div>
+          <div class="form-group">
+            <label>Academic Year</label>
+            <select id="addAcademicYear" required>
+              <option value="1st Year">1st Year</option>
+              <option value="2nd Year">2nd Year</option>
+              <option value="3rd Year">3rd Year</option>
+              <option value="4th Year">4th Year</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Section Field</label>
+            <input type="text" id="addSectionName" required placeholder="e.g. A, B, CSE-1" style="text-transform:uppercase;">
+          </div>
+          <button type="submit" id="addBtn" style="width:100%;">Add Entry to Directory</button>
+        </form>
+      </div>
+
+      <!-- College Directory Table -->
+      <div class="card">
+        <h3>Active College Directory</h3>
+        <div class="table-wrap">
+          <table id="collegeDirectoryTable">
+            <thead>
+              <tr>
+                <th>College</th>
+                <th>Dept.</th>
+                <th>Year</th>
+                <th>Section</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Edit Entry Modal -->
+  <div class="modal-overlay" id="editModal">
+    <div class="card modal-card">
+      <h3>Edit Directory Entry</h3>
+      <p class="text-muted" style="margin-top:2px;">Update details for this class allocation.</p>
+
+      <form id="editCollegeSectionForm" style="margin-top:16px;">
+        <input type="hidden" id="editEntryId">
+        <div class="form-group">
+          <label>College Name</label>
+          <input type="text" id="editCollegeName" required style="text-transform:uppercase;">
+        </div>
+        <div class="form-group">
+          <label>Department</label>
+          <input type="text" id="editDepartment" required style="text-transform:uppercase;">
+        </div>
+        <div class="form-group">
+          <label>Academic Year</label>
+          <select id="editAcademicYear" required>
+            <option value="1st Year">1st Year</option>
+            <option value="2nd Year">2nd Year</option>
+            <option value="3rd Year">3rd Year</option>
+            <option value="4th Year">4th Year</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Section Field</label>
+          <input type="text" id="editSectionName" required style="text-transform:uppercase;">
+        </div>
+
+        <div class="flex-space" style="margin-top:20px; margin-bottom:0;">
+          <button type="submit" id="saveEditBtn">Save Changes</button>
+          <button type="button" onclick="closeEditModal()" class="secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Dynamic Footer -->
+  <div id="admin-footer-placeholder"></div>
+
+  <div id="globalToast"></div>
+
+  <script>
+    let directoryRows = [];
+
+    function up(val) { return (val || '').toString().toUpperCase(); }
+
+    let toastTimer;
+    function toast(msg, type) {
+      const el = document.getElementById('globalToast');
+      el.textContent = msg;
+      el.className = 'show' + (type ? ' ' + type : '');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+    }
+
+    function withLoading(btn, label) {
+      const original = btn.innerText;
+      btn.disabled = true;
+      btn.innerText = label || 'Working…';
+      return () => { btn.disabled = false; btn.innerText = original; };
+    }
+
+    function logout() {
+      sessionStorage.removeItem('session_user');
+      window.location.href = '../index.html';
+    }
+
+    (async function init() {
+      const cached = sessionStorage.getItem('session_user');
+      if (!cached) { window.location.href = '../index.html'; return; }
+      const user = JSON.parse(cached);
+      if (user.role !== 'admin') { window.location.href = '../index.html'; return; }
+
+      try {
+        const [hRes, fRes] = await Promise.all([
+          fetch('Adminheader.html'),
+          fetch('Adminfooter.html')
+        ]);
+        if (hRes.ok) {
+          document.getElementById('admin-header-placeholder').innerHTML = await hRes.text();
+          const activeLink = document.getElementById('nav-colleges');
+          if (activeLink) activeLink.classList.add('active');
+        }
+        if (fRes.ok) document.getElementById('admin-footer-placeholder').innerHTML = await fRes.text();
+      } catch (err) { console.error('Failed loading layout components', err); }
+
+      document.getElementById('addCollegeSectionForm').addEventListener('submit', handleAddEntry);
+      document.getElementById('editCollegeSectionForm').addEventListener('submit', handleSaveEdit);
+
+      await loadDirectoryData();
+    })();
+
+    async function loadDirectoryData() {
+      const tbody = document.querySelector('#collegeDirectoryTable tbody');
+      tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Loading directory…</td></tr>`;
+
+      try {
+        const { data, error } = await sb.from('college_sections')
+          .select('*')
+          .order('college_name')
+          .order('department')
+          .order('section_name');
+
+        if (error) throw error;
+        directoryRows = data || [];
+        renderDirectoryTable();
+      } catch (err) {
+        console.error(err);
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Could not load directory entries.</td></tr>`;
+      }
+    }
+
+    function renderDirectoryTable() {
+      const tbody = document.querySelector('#collegeDirectoryTable tbody');
+      if (directoryRows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No colleges or sections added yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      directoryRows.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td data-label="College"><b>${up(row.college_name)}</b></td>
+          <td data-label="Dept.">${up(row.department || '-')}</td>
+          <td data-label="Year"><span class="mono">${row.academic_year || '1st Year'}</span></td>
+          <td data-label="Section">${up(row.section_name)}</td>
+          <td data-label="Actions">
+            <button class="secondary" style="padding: 6px 12px; font-size: 12px; margin-right:4px;" onclick="openEditModal(${row.id})">Edit</button>
+            <button class="danger" style="padding: 6px 12px; font-size: 12px;" onclick="deleteEntry(${row.id})">Remove</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function handleAddEntry(e) {
+      e.preventDefault();
+      const restore = withLoading(document.getElementById('addBtn'), 'Adding…');
+
+      const college = document.getElementById('addCollegeName').value.trim().toUpperCase();
+      const dept = document.getElementById('addDepartment').value.trim().toUpperCase();
+      const year = document.getElementById('addAcademicYear').value;
+      const section = document.getElementById('addSectionName').value.trim().toUpperCase();
+
+      try {
+        const { error } = await sb.from('college_sections').insert({
+          college_name: college,
+          department: dept,
+          academic_year: year,
+          section_name: section
+        });
+
+        if (error) throw error;
+
+        document.getElementById('addCollegeSectionForm').reset();
+        toast('Entry added to directory.', 'success');
+        await loadDirectoryData();
+      } catch (err) {
+        console.error(err);
+        toast(err.code === '23505' ? 'This college entry already exists.' : 'Could not add entry.', 'error');
+      } finally {
+        restore();
+      }
+    }
+
+    function openEditModal(id) {
+      const item = directoryRows.find(r => r.id === id);
+      if (!item) return;
+
+      document.getElementById('editEntryId').value = item.id;
+      document.getElementById('editCollegeName').value = item.college_name || '';
+      document.getElementById('editDepartment').value = item.department || '';
+      document.getElementById('editAcademicYear').value = item.academic_year || '1st Year';
+      document.getElementById('editSectionName').value = item.section_name || '';
+
+      document.getElementById('editModal').classList.add('active');
+    }
+
+    function closeEditModal() {
+      document.getElementById('editModal').classList.remove('active');
+    }
+
+    async function handleSaveEdit(e) {
+      e.preventDefault();
+      const id = document.getElementById('editEntryId').value;
+      const restore = withLoading(document.getElementById('saveEditBtn'), 'Saving…');
+
+      const updatedData = {
+        college_name: document.getElementById('editCollegeName').value.trim().toUpperCase(),
+        department: document.getElementById('editDepartment').value.trim().toUpperCase(),
+        academic_year: document.getElementById('editAcademicYear').value,
+        section_name: document.getElementById('editSectionName').value.trim().toUpperCase()
+      };
+
+      try {
+        const { error } = await sb.from('college_sections').update(updatedData).eq('id', id);
+        if (error) throw error;
+
+        toast('Directory updated.', 'success');
+        closeEditModal();
+        await loadDirectoryData();
+      } catch (err) {
+        console.error(err);
+        toast('Could not save updates.', 'error');
+      } finally {
+        restore();
+      }
+    }
+
+    async function deleteEntry(id) {
+      if (!confirm('Are you sure you want to remove this entry?')) return;
+
+      try {
+        const { error } = await sb.from('college_sections').delete().eq('id', id);
+        if (error) throw error;
+
+        toast('Entry removed.', 'success');
+        await loadDirectoryData();
+      } catch (err) {
+        console.error(err);
+        toast('Could not remove entry.', 'error');
+      }
+    }
+  </script>
+</body>
+</html>

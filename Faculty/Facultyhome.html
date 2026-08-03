@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Faculty Portal · AVR HRMS</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Supabase CDN & Config -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../static/js/config.js"></script>
+
+  <link rel="stylesheet" href="../static/css/styles.css">
+  <style>
+    .main-site-header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-dark) 100%);
+      color: #fff;
+      padding: 16px 24px;
+      border-bottom: 4px solid var(--amber);
+      margin-bottom: 24px;
+    }
+    .header-container {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .brand-identity { display: flex; align-items: center; gap: 16px; }
+    .company-logo { height: 44px; width: auto; object-fit: contain; }
+    .company-title { color: #fff; font-size: 18px; margin: 0; }
+    .portal-subtext { font-size: 12px; color: #bfcbdc; letter-spacing: .05em; text-transform: uppercase; }
+
+    /* Modal Overlay Styles */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(14, 33, 56, 0.6);
+      display: none; align-items: center; justify-content: center;
+      padding: 16px; z-index: 100;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-card { width: 100%; max-width: 400px; margin: 0; border-top: 4px solid var(--navy); }
+
+    .main-site-footer {
+      background: var(--navy-dark);
+      color: #e2e8f0;
+      padding: 36px 24px 18px;
+      margin-top: 40px;
+      border-top: 1px solid var(--rule-strong);
+    }
+    .footer-container {
+      max-width: 1200px; margin: 0 auto;
+      display: grid; grid-template-columns: 1.4fr 1fr; gap: 32px;
+    }
+    .main-site-footer h4 { color: var(--amber); font-size: 15px; margin-bottom: 10px; }
+    .footer-address { font-style: normal; font-size: 13.5px; line-height: 1.6; color: #cbd5e1; }
+    .footer-contact-list { list-style: none; padding: 0; font-size: 13.5px; }
+    .footer-contact-list li { margin-bottom: 8px; }
+    .footer-contact-list a { color: #93c5fd; text-decoration: none; }
+    .footer-bottom {
+      max-width: 1200px; margin: 24px auto 0; padding-top: 16px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.15); text-align: center; font-size: 12px; color: #94a3b8;
+    }
+
+    /* Export Controls Box */
+    .export-controls-bar {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 768px) { .footer-container { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+  <!-- Dynamic Header -->
+  <div id="faculty-header-placeholder"></div>
+
+  <main class="container">
+    <h2 style="margin-bottom: 4px;">Welcome, <span id="facultyGreeting">-</span></h2>
+    <p class="text-muted" style="margin-bottom: 20px;">Track daily coverage and trainers assigned to your classes</p>
+
+    <!-- Assigned Classes & Active Trainers -->
+    <div class="two-col" style="grid-template-columns: 1fr 1.4fr;">
+      <div class="card">
+        <h3>Your Assigned Classes</h3>
+        <div class="table-wrap">
+          <table id="facultyAssignedTable">
+            <thead>
+              <tr>
+                <th>College</th>
+                <th>Dept / Section</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Active Trainers</h3>
+        <p class="text-muted" style="margin-top:2px; margin-bottom:12px;">Trainers covering your assigned sections and contact details</p>
+        <div class="table-wrap">
+          <table id="facultyTrainerTable">
+            <thead>
+              <tr>
+                <th>Trainer</th>
+                <th>Contact Phone</th>
+                <th>Section</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Class Coverage Logs Table -->
+    <div class="card" style="margin-top: 20px;">
+      <div class="flex-space" style="margin-bottom:12px;">
+        <h3 style="margin-bottom:0;">Class Coverage Log Matrix</h3>
+        <select id="facultySectionFilter" style="width:240px;" onchange="renderFacultyLogs()">
+          <option value="all">All Assigned Classes</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table id="facultyLogTable">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>College / Section</th>
+              <th>Trainer Name</th>
+              <th>Coverage Description</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Trainer Detail Log View with Export Controls -->
+    <div id="trainerDetailZone" class="card hidden" style="margin-top: 20px;">
+      <div class="flex-space" style="margin-bottom: 16px;">
+        <h3>Trainer Activity Log — <span id="trainerLogHeading" class="mono" style="color:var(--navy);">-</span></h3>
+        
+        <!-- Export & Date Range Controls -->
+        <div class="export-controls-bar">
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 10px; margin: 0;">Start Date</label>
+            <input type="date" id="exportStartDate" onchange="renderTrainerLogTable()" style="padding: 6px 10px; font-size: 13px;">
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 10px; margin: 0;">End Date</label>
+            <input type="date" id="exportEndDate" onchange="renderTrainerLogTable()" style="padding: 6px 10px; font-size: 13px;">
+          </div>
+          <button onclick="exportTrainerLogsCSV()" style="padding: 8px 16px; font-size: 13px; background: var(--teal);">📥 Export CSV</button>
+          <button onclick="closeTrainerDetail()" class="secondary" style="padding: 8px 16px; font-size: 13px;">Close View</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table id="trainerLogTable">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Day Type</th>
+              <th>Description / Concepts Covered</th>
+              <th>Contact Number</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Change Password Modal -->
+  <div class="modal-overlay" id="passwordModal">
+    <div class="card modal-card">
+      <h3>Update Credentials</h3>
+      <p class="text-muted" style="margin-top:2px;">Change your account password key</p>
+
+      <form id="passwordForm" style="margin-top:16px;">
+        <div class="form-group">
+          <label>New Password</label>
+          <input type="password" id="updatedPassword" required placeholder="Enter new password">
+        </div>
+        <div class="flex-space" style="margin-top:20px; margin-bottom:0;">
+          <button type="submit" id="pwSaveBtn">Save Updates</button>
+          <button type="button" onclick="closePasswordModal()" class="secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Dynamic Footer -->
+  <div id="faculty-footer-placeholder"></div>
+
+  <div id="globalToast"></div>
+
+  <script>
+    let state = {
+      currentUser: null,
+      assignments: [],
+      facultyLogs: [],
+      userPhoneMap: {},
+      trainerRows: [],
+      activeTrainerContext: null // Holds current viewing details { username, college, section }
+    };
+
+    function up(val) { return (val || '').toString().toUpperCase(); }
+
+    let toastTimer;
+    function toast(msg, type) {
+      const el = document.getElementById('globalToast');
+      el.textContent = msg;
+      el.className = 'show' + (type ? ' ' + type : '');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+    }
+
+    function withLoading(btn, label) {
+      const original = btn.innerText;
+      btn.disabled = true;
+      btn.innerText = label || 'Working…';
+      return () => { btn.disabled = false; btn.innerText = original; };
+    }
+
+    function logout() {
+      sessionStorage.removeItem('session_user');
+      window.location.href = '../index.html';
+    }
+
+    (async function init() {
+      const cached = sessionStorage.getItem('session_user');
+      if (!cached) { window.location.href = '../index.html'; return; }
+      const user = JSON.parse(cached);
+      if (user.role !== 'faculty' && user.role !== 'coordinator') { window.location.href = '../index.html'; return; }
+      state.currentUser = user;
+
+      try {
+        const [hRes, fRes] = await Promise.all([
+          fetch('Facultyheader.html'),
+          fetch('Facultyfooter.html')
+        ]);
+        if (hRes.ok) document.getElementById('faculty-header-placeholder').innerHTML = await hRes.text();
+        if (fRes.ok) document.getElementById('faculty-footer-placeholder').innerHTML = await fRes.text();
+      } catch (err) { console.error('Failed loading layout components', err); }
+
+      document.getElementById('facultyGreeting').innerText = state.currentUser.username;
+      document.getElementById('passwordForm').addEventListener('submit', commitPasswordChange);
+
+      await loadTrainerContacts();
+      await renderFacultyView();
+    })();
+
+    async function loadTrainerContacts() {
+      try {
+        const { data, error } = await sb.from('users').select('username, phone_number');
+        if (error) throw error;
+        state.userPhoneMap = {};
+        (data || []).forEach(u => {
+          state.userPhoneMap[u.username] = u.phone_number || 'N/A';
+        });
+      } catch (err) { console.error('Failed to fetch phone numbers', err); }
+    }
+
+    async function renderFacultyView() {
+      try {
+        const { data: assigns, error: assignErr } = await sb.from('coordinator_assignments')
+          .select('*')
+          .eq('coordinator_username', state.currentUser.username);
+
+        if (assignErr) throw assignErr;
+        state.assignments = assigns || [];
+      } catch (err) {
+        console.error(err);
+        toast('Could not load assigned classes.', 'error');
+        return;
+      }
+
+      const assignedTbody = document.querySelector('#facultyAssignedTable tbody');
+      const trainerTbody = document.querySelector('#facultyTrainerTable tbody');
+      const filterSelect = document.getElementById('facultySectionFilter');
+
+      if (state.assignments.length === 0) {
+        assignedTbody.innerHTML = `<tr><td colspan="2" class="empty-state">No classes assigned to you yet. Contact Admin.</td></tr>`;
+        trainerTbody.innerHTML = `<tr><td colspan="4" class="empty-state">No trainers assigned.</td></tr>`;
+        filterSelect.innerHTML = `<option value="all">No assigned classes</option>`;
+        document.querySelector('#facultyLogTable tbody').innerHTML = `<tr><td colspan="4" class="empty-state">No logs available.</td></tr>`;
+        return;
+      }
+
+      assignedTbody.innerHTML = '';
+      state.assignments.forEach(a => {
+        const tr = document.createElement('tr');
+        const deptSec = (a.department ? up(a.department) + ' - ' : '') + up(a.section_name);
+        tr.innerHTML = `<td data-label="College"><b>${up(a.college_name)}</b></td><td data-label="Dept / Section">${deptSec}</td>`;
+        assignedTbody.appendChild(tr);
+      });
+
+      filterSelect.innerHTML = '<option value="all">All Assigned Classes</option>' +
+        state.assignments.map(a => {
+          const key = a.college_name + '|||' + a.section_name;
+          const label = `${up(a.college_name)} - ${a.department ? up(a.department) + ' (' + up(a.section_name) + ')' : up(a.section_name)}`;
+          return `<option value="${key}">${label}</option>`;
+        }).join('');
+
+      try {
+        const { data: logs, error: logErr } = await sb.from('tracker_logs')
+          .select('*')
+          .order('date', { ascending: false });
+
+        if (logErr) throw logErr;
+
+        state.facultyLogs = (logs || []).filter(l => {
+          return state.assignments.some(a => {
+            if (a.college_name !== l.college_name) return false;
+            const assignedSecs = (a.section_name || '').split(',').map(s => s.trim().toUpperCase());
+            return assignedSecs.includes(l.section.toUpperCase());
+          });
+        });
+
+      } catch (err) {
+        console.error(err);
+        toast('Could not load coverage logs.', 'error');
+        return;
+      }
+
+      renderTrainerDetails();
+      renderFacultyLogs();
+    }
+
+    function renderFacultyLogs() {
+      const filterVal = document.getElementById('facultySectionFilter').value;
+      const tbody = document.querySelector('#facultyLogTable tbody');
+
+      let filteredLogs = state.facultyLogs;
+      if (filterVal !== 'all') {
+        const [college, section] = filterVal.split('|||');
+        const allowedSecs = section.split(',').map(s => s.trim().toUpperCase());
+
+        filteredLogs = filteredLogs.filter(l => l.college_name === college && allowedSecs.includes(l.section.toUpperCase()));
+      }
+
+      if (filteredLogs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-state">No coverage logged yet for selected class.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      filteredLogs.forEach(log => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td data-label="Date" class="mono">${log.date}</td>
+          <td data-label="College / Section"><b>${up(log.college_name)}</b> (${up(log.section)})</td>
+          <td data-label="Trainer Name"><b>${log.username}</b></td>
+          <td data-label="Coverage Description">${log.description || '-'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderTrainerDetails() {
+      const tbody = document.querySelector('#facultyTrainerTable tbody');
+      const seen = new Set();
+      state.trainerRows = [];
+
+      state.facultyLogs.forEach(l => {
+        const key = l.username + '|||' + l.college_name + '|||' + l.section;
+        if (!seen.has(key)) {
+          seen.add(key);
+          state.trainerRows.push({ username: l.username, college_name: l.college_name, section: l.section });
+        }
+      });
+
+      if (state.trainerRows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-state">No trainers have submitted logs for your sections yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      state.trainerRows.forEach(row => {
+        const tr = document.createElement('tr');
+        const phone = state.userPhoneMap[row.username] || 'N/A';
+        tr.innerHTML = `
+          <td data-label="Trainer"><b>${row.username}</b></td>
+          <td data-label="Contact Phone" class="mono">${phone}</td>
+          <td data-label="Section">${up(row.section)}</td>
+          <td data-label="Action">
+            <button class="secondary" style="padding: 4px 8px; font-size: 11px;" onclick="viewTrainerLog('${row.username}', '${row.college_name.replace(/'/g, "\\'")}', '${row.section.replace(/'/g, "\\'")}')">View Activity ↗</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function viewTrainerLog(username, college, section) {
+      state.activeTrainerContext = { username, college, section };
+
+      const zone = document.getElementById('trainerDetailZone');
+      const heading = document.getElementById('trainerLogHeading');
+
+      heading.innerText = `${username} — ${up(college)} (${up(section)})`;
+      zone.classList.remove('hidden');
+      zone.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      // Reset dates
+      document.getElementById('exportStartDate').value = '';
+      document.getElementById('exportEndDate').value = '';
+
+      renderTrainerLogTable();
+    }
+
+    function getFilteredTrainerLogs() {
+      if (!state.activeTrainerContext) return [];
+      const { username, college, section } = state.activeTrainerContext;
+
+      const sDate = document.getElementById('exportStartDate').value;
+      const eDate = document.getElementById('exportEndDate').value;
+
+      return state.facultyLogs.filter(l => {
+        if (l.username !== username || l.college_name !== college || l.section !== section) return false;
+        if (sDate && l.date < sDate) return false;
+        if (eDate && l.date > eDate) return false;
+        return true;
+      });
+    }
+
+    function renderTrainerLogTable() {
+      const tbody = document.querySelector('#trainerLogTable tbody');
+      const logs = getFilteredTrainerLogs();
+
+      if (logs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-state">No logs found for selected date range.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      logs.forEach(l => {
+        const phone = state.userPhoneMap[l.username] || 'N/A';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td data-label="Date" class="mono">${l.date}</td>
+          <td data-label="Day Type">${l.day_type}</td>
+          <td data-label="Description / Concepts Covered">${l.description || '-'}</td>
+          <td data-label="Contact Number" class="mono">${phone}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function exportTrainerLogsCSV() {
+      const logs = getFilteredTrainerLogs();
+      if (logs.length === 0) {
+        toast('No logs available to export for selected range.', 'error');
+        return;
+      }
+
+      const { username, college, section } = state.activeTrainerContext;
+      const phone = state.userPhoneMap[username] || 'N/A';
+
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "Trainer Username,College,Section,Date,Day Type,Concepts Covered / Description,Contact Number\n";
+
+      logs.forEach(l => {
+        const cleanDesc = (l.description || '-').replace(/"/g, '""');
+        csvContent += `"${l.username}","${l.college_name}","${l.section}","${l.date}","${l.day_type}","${cleanDesc}","${phone}"\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Trainer_Report_${username}_${college}_${section}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast('CSV Report downloaded successfully.', 'success');
+    }
+
+    function closeTrainerDetail() {
+      document.getElementById('trainerDetailZone').classList.add('hidden');
+      state.activeTrainerContext = null;
+    }
+
+    function openPasswordModal() { document.getElementById('passwordModal').classList.add('active'); }
+    function closePasswordModal() { document.getElementById('passwordModal').classList.remove('active'); }
+
+    async function commitPasswordChange(e) {
+      e.preventDefault();
+      const newPass = document.getElementById('updatedPassword').value;
+      if (!newPass) return;
+
+      const restore = withLoading(document.getElementById('pwSaveBtn'), 'Saving…');
+      try {
+        const { error } = await sb.from('users').update({ password_hash: newPass }).eq('username', state.currentUser.username);
+        if (error) throw error;
+
+        state.currentUser.password_hash = newPass;
+        sessionStorage.setItem('session_user', JSON.stringify(state.currentUser));
+        toast('Password updated successfully.', 'success');
+        document.getElementById('passwordForm').reset();
+        closePasswordModal();
+      } catch (err) {
+        console.error(err);
+        toast('Could not update password.', 'error');
+      } finally {
+        restore();
+      }
+    }
+  </script>
+</body>
+</html>
