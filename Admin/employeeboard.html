@@ -345,6 +345,7 @@
     let employeeList = [];
     let activeInspectionLogs = [];
     let currentInspectedUser = null;
+    let currentUserData = null; // Holds employment profile for base pay logic
     let currentUserAdvanceOwed = 0;
 
     function up(val) { return (val || '').toString().toUpperCase(); }
@@ -563,6 +564,8 @@
     /* --- Log Auditing & Payout Operations --- */
     async function inspectUserLogs(username) {
       currentInspectedUser = username;
+      currentUserData = employeeList.find(e => e.username === username) || null;
+
       const zone = document.getElementById('adminInspectionZone');
       zone.classList.remove('hidden');
       document.getElementById('inspectedUser').innerText = username;
@@ -623,6 +626,7 @@
 
       let pendingGrossSum = 0;
       let pendingExpSum = 0;
+      let hasPendingLogs = false;
 
       tbody.innerHTML = "";
       if (filtered.length === 0) {
@@ -633,7 +637,11 @@
           const exp = Number(log.travel_expense || 0) + Number(log.food_expense || 0);
 
           if (log.status === 'Pending') {
-            pendingGrossSum += base;
+            hasPendingLogs = true;
+            // Sum per-day base pay only for Freelance/Interns
+            if (currentUserData && currentUserData.employment_type !== 'Fixed Salary') {
+              pendingGrossSum += base;
+            }
             pendingExpSum += exp;
           }
 
@@ -649,6 +657,11 @@
             <td data-label="Status">${statusMarkup(log.status)}</td>`;
           tbody.appendChild(tr);
         });
+      }
+
+      // If Fixed Salary employee has pending logs, add monthly base salary ONCE
+      if (currentUserData && currentUserData.employment_type === 'Fixed Salary' && hasPendingLogs) {
+        pendingGrossSum = Number(currentUserData.default_rate || 0);
       }
 
       // Net Pending Payable = (Pending Base + Pending Expenses) - Advance Owed
@@ -700,6 +713,7 @@
     function closeInspection() {
       document.getElementById('adminInspectionZone').classList.add('hidden');
       currentInspectedUser = null;
+      currentUserData = null;
     }
 
     function statusMarkup(status) {
@@ -715,12 +729,21 @@
 
       let pendingGrossSum = 0;
       let pendingExpSum = 0;
+      let hasPendingLogs = false;
+
       filtered.forEach(l => {
         if (l.status === 'Pending') {
-          pendingGrossSum += Number(l.base_pay || 0);
+          hasPendingLogs = true;
+          if (currentUserData && currentUserData.employment_type !== 'Fixed Salary') {
+            pendingGrossSum += Number(l.base_pay || 0);
+          }
           pendingExpSum += (Number(l.travel_expense || 0) + Number(l.food_expense || 0));
         }
       });
+
+      if (currentUserData && currentUserData.employment_type === 'Fixed Salary' && hasPendingLogs) {
+        pendingGrossSum = Number(currentUserData.default_rate || 0);
+      }
 
       const netPayable = Math.max(0, (pendingGrossSum + pendingExpSum) - currentUserAdvanceOwed);
 

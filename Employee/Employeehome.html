@@ -460,10 +460,26 @@
       select.innerHTML = optionsHTML;
     }
 
+    /**
+     * Helper to compute base pay based on employment type.
+     * Fixed Salary employees receive monthly base pay, so daily logs track expenses only (₹0 base pay).
+     */
+    function getDailyBasePay(user, dayType) {
+      const defaultRate = Number(user.default_rate || 0);
+      const empType = user.employment_type || 'Freelance';
+
+      if (empType === 'Fixed Salary') {
+        return 0; // Fixed salary staff get ₹0 base pay per daily field log
+      }
+
+      if (dayType === 'Full Day') return defaultRate;
+      if (dayType === 'Half Day') return defaultRate / 2;
+      return 0; // Canceled
+    }
+
     function calculateProjectedPay() {
       if (!state.currentUser) return;
-      const rate = Number(state.currentUser.default_rate || 0);
-      const type = document.getElementById('logDayType').value;
+      const dayType = document.getElementById('logDayType').value;
 
       const allowTravel = !!state.currentUser.allow_travel_expense;
       const allowFood = !!state.currentUser.allow_food_expense;
@@ -471,12 +487,9 @@
       const travel = allowTravel ? (parseFloat(document.getElementById('logTravel').value) || 0) : 0;
       const food = allowFood ? (parseFloat(document.getElementById('logFood').value) || 0) : 0;
 
-      let base = 0;
-      if (type === 'Full Day') base = rate;
-      if (type === 'Half Day') base = rate / 2;
-      if (type === 'Canceled') base = 0;
-
+      const base = getDailyBasePay(state.currentUser, dayType);
       const total = base + travel + food;
+
       document.getElementById('projectedCalculation').innerText = "₹" + total.toLocaleString('en-IN');
     }
 
@@ -491,12 +504,9 @@
         const travel = allowTravel ? (parseFloat(document.getElementById('logTravel').value) || 0) : 0;
         const food = allowFood ? (parseFloat(document.getElementById('logFood').value) || 0) : 0;
         const type = document.getElementById('logDayType').value;
-        const rate = Number(state.currentUser.default_rate || 0);
 
-        let base = 0;
-        if (type === 'Full Day') base = rate;
-        if (type === 'Half Day') base = rate / 2;
-        if (type === 'Canceled') base = 0;
+        // Correctly assigns base pay based on employment type
+        const base = getDailyBasePay(state.currentUser, type);
 
         const newLog = {
           username: state.currentUser.username,
