@@ -60,7 +60,7 @@
       cursor: pointer;
     }
 
-    /* Inspection Metrics Bar (Updated to 4 Columns) */
+    /* Inspection Metrics Bar */
     .audit-summary-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -76,6 +76,17 @@
     }
     .audit-card h4 { font-size: 10px; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 4px; }
     .audit-card .val { font-family: 'IBM Plex Mono', monospace; font-size: 18px; font-weight: 700; color: var(--ink); }
+
+    .selection-bar {
+      background: #f8fafc;
+      border: 1px dashed var(--rule-strong);
+      border-radius: 6px;
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
 
     .main-site-footer {
       background: var(--navy-dark);
@@ -185,19 +196,19 @@
       <div class="flex-space" style="margin-bottom: 8px;">
         <div>
           <h3 style="margin-bottom: 2px;">Auditing Logs for: <span id="inspectedUser" class="mono" style="color:var(--navy);">-</span></h3>
-          <p class="text-muted" style="margin:0; font-size:12px;">Inspect attendance records, filter date ranges, and process payouts</p>
+          <p class="text-muted" style="margin:0; font-size:12px;">Select unsettled records to disburse payouts and manage advances</p>
         </div>
         <button onclick="closeInspection()" class="secondary">Close Audit View</button>
       </div>
 
-      <!-- Audit Summary Cards (Including Advance Extra Paid Card) -->
+      <!-- Audit Summary Cards -->
       <div class="audit-summary-grid">
         <div class="audit-card" style="border-top-color: var(--navy);">
-          <h4>Unsettled Gross Base Pay</h4>
+          <h4>All Unsettled Base Pay</h4>
           <div id="cardGrossPay" class="val">₹0</div>
         </div>
         <div class="audit-card" style="border-top-color: var(--amber);">
-          <h4>Unsettled Expenses</h4>
+          <h4>All Unsettled Expenses</h4>
           <div id="cardExpenses" class="val">₹0</div>
         </div>
         <div class="audit-card" style="border-top-color: var(--danger);">
@@ -208,6 +219,18 @@
           <h4 id="cardNetPayableLabel">Net Pending Payable</h4>
           <div id="cardNetPayable" class="val" style="color:var(--teal);">₹0</div>
         </div>
+      </div>
+
+      <!-- Interactive Selection Status Bar -->
+      <div class="selection-bar">
+        <div>
+          <strong>Selected for Settlement:</strong> 
+          <span id="selectedCount" class="mono">0</span> logs 
+          (<span id="selectedAmount" class="mono" style="color: var(--teal); font-weight:700;">₹0</span>)
+        </div>
+        <button id="disburseSelectedBtn" onclick="openPayoutModal()" style="background: var(--teal); font-weight: 700; padding: 8px 18px;" disabled>
+          💰 Disburse Selected (₹0)
+        </button>
       </div>
 
       <!-- Filters & Action Bar -->
@@ -223,15 +246,16 @@
           </div>
           <button onclick="exportLogsCSV()" class="secondary" style="padding: 8px 14px; font-size: 12px;">📥 Export CSV</button>
         </div>
-
-        <button onclick="openPayoutModal()" style="background: var(--teal); font-weight: 700; padding: 10px 20px;">💰 Disburse Salary Payout</button>
       </div>
 
-      <!-- Logs Table -->
+      <!-- Logs Table with Selection Checkboxes -->
       <div class="table-wrap">
         <table id="inspectionTable">
           <thead>
             <tr>
+              <th style="width: 38px; text-align: center;">
+                <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
+              </th>
               <th>Date</th>
               <th>College / Section</th>
               <th>Day Type</th>
@@ -298,22 +322,23 @@
 
   <!-- Salary Settlement Modal -->
   <div class="modal-overlay" id="payoutModal">
-    <div class="card modal-card" style="max-width: 460px; border-top-color: var(--teal);">
+    <div class="card modal-card" style="max-width: 480px; border-top-color: var(--teal);">
       <h3>Disburse Salary Payout</h3>
       <p class="text-muted" style="margin-top:2px;">Process payment transfer for <strong id="payoutEmpTarget">-</strong></p>
 
       <form id="payoutForm" style="margin-top:16px;">
         <div class="form-group">
-          <label>Unsettled Gross Earnings (₹)</label>
+          <label>Selected Cleared Earnings (Base + Exp) (₹)</label>
           <input type="number" id="payoutGross" readonly style="background:#f1f5f9; font-weight:600;">
         </div>
         <div class="form-group">
-          <label>Unsettled Expenses (₹)</label>
-          <input type="number" id="payoutExpenses" readonly style="background:#f1f5f9; font-weight:600;">
+          <label>Existing Running Advance Deducted (₹)</label>
+          <input type="number" id="payoutAdvanceDeducted" readonly style="background:#fef2f2; color:var(--danger); font-weight:600;">
         </div>
         <div class="form-group">
           <label>Actual Amount Transferred Today (₹)</label>
-          <input type="number" id="payoutNetPaid" required value="0" min="0" style="background:#e6f4ea; color:var(--teal); font-weight:700; font-size:18px;">
+          <input type="number" id="payoutNetPaid" required value="0" min="0" step="any" style="background:#e6f4ea; color:var(--teal); font-weight:700; font-size:18px;">
+          <small class="text-muted" id="payoutHintText" style="display:block; margin-top:4px;">Disbursing more than cleared creates an advance balance.</small>
         </div>
         <div class="form-group">
           <label>Payment Mode</label>
@@ -345,10 +370,17 @@
     let employeeList = [];
     let activeInspectionLogs = [];
     let currentInspectedUser = null;
-    let currentUserData = null; // Holds employment profile for base pay logic
+    let currentUserData = null;
     let currentUserAdvanceOwed = 0;
+    let selectedLogIds = new Set();
 
     function up(val) { return (val || '').toString().toUpperCase(); }
+
+    function logout() {
+      sessionStorage.removeItem('session_user');
+      window.location.href = '../index.html';
+    }
+    window.logout = logout;
 
     let toastTimer;
     function toast(msg, type) {
@@ -364,11 +396,6 @@
       btn.disabled = true;
       btn.innerText = label || 'Working…';
       return () => { btn.disabled = false; btn.innerText = original; };
-    }
-
-    function logout() {
-      sessionStorage.removeItem('session_user');
-      window.location.href = '../index.html';
     }
 
     (async function init() {
@@ -561,10 +588,11 @@
       }
     }
 
-    /* --- Log Auditing & Payout Operations --- */
+    /* --- Auditing & Checkbox Payout Engine --- */
     async function inspectUserLogs(username) {
       currentInspectedUser = username;
       currentUserData = employeeList.find(e => e.username === username) || null;
+      selectedLogIds.clear();
 
       const zone = document.getElementById('adminInspectionZone');
       zone.classList.remove('hidden');
@@ -584,28 +612,27 @@
         if (logsErr) throw logsErr;
         activeInspectionLogs = logsData || [];
 
-        // 2. Fetch employee payout history to calculate Advance Balance
+        // 2. Fetch employee payout history to calculate Running Advance Balance
         const { data: payoutData, error: payoutErr } = await sb.from('payout_records')
           .select('gross_amount, expense_amount, net_paid')
           .eq('username', username);
 
         if (payoutErr) throw payoutErr;
 
-        // Calculate running Advance Balance: Total Disbursed Net Paid - Total Cleared Earnings
-        let totalPaidOut = 0;
-        let totalEarnedCleared = 0;
+        let totalDisbursed = 0;
+        let totalCleared = 0;
         (payoutData || []).forEach(p => {
-          totalPaidOut += Number(p.net_paid || 0);
-          totalEarnedCleared += (Number(p.gross_amount || 0) + Number(p.expense_amount || 0));
+          totalDisbursed += Number(p.net_paid || 0);
+          totalCleared += (Number(p.gross_amount || 0) + Number(p.expense_amount || 0));
         });
 
-        // Advance owed = Total Cash Transferred - Total Settled Earnings
-        currentUserAdvanceOwed = Math.max(0, totalPaidOut - totalEarnedCleared);
+        // Running Advance Balance = Total Cash Disbursed - Total Cleared Earnings
+        currentUserAdvanceOwed = Math.max(0, totalDisbursed - totalCleared);
 
         renderFilteredInspectionLogs();
       } catch (err) {
         console.error(err);
-        document.querySelector('#inspectionTable tbody').innerHTML = `<tr><td colspan="8" class="empty-state">Could not load logs.</td></tr>`;
+        document.querySelector('#inspectionTable tbody').innerHTML = `<tr><td colspan="9" class="empty-state">Could not load logs.</td></tr>`;
       }
     }
 
@@ -624,51 +651,52 @@
       const tbody = document.querySelector('#inspectionTable tbody');
       const filtered = getFilteredLogs();
 
-      let pendingGrossSum = 0;
-      let pendingExpSum = 0;
-      let hasPendingLogs = false;
+      let totalUnsettledGross = 0;
+      let totalUnsettledExp = 0;
 
       tbody.innerHTML = "";
       if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="empty-state">No daily logs found for selected criteria.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="empty-state">No daily logs found for selected criteria.</td></tr>`;
       } else {
         filtered.forEach((log) => {
+          const isSettled = !!log.is_settled;
           const base = Number(log.base_pay || 0);
           const exp = Number(log.travel_expense || 0) + Number(log.food_expense || 0);
 
-          if (log.status === 'Pending') {
-            hasPendingLogs = true;
-            // Sum per-day base pay only for Freelance/Interns
-            if (currentUserData && currentUserData.employment_type !== 'Fixed Salary') {
-              pendingGrossSum += base;
-            }
-            pendingExpSum += exp;
+          if (!isSettled) {
+            totalUnsettledGross += base;
+            totalUnsettledExp += exp;
           }
 
           const tr = document.createElement('tr');
           tr.innerHTML = `
+            <td style="text-align:center;">
+              <input type="checkbox" 
+                     class="log-checkbox" 
+                     data-id="${log.id}" 
+                     data-base="${base}"
+                     data-exp="${exp}"
+                     data-gross="${log.gross_earnings || (base + exp)}"
+                     ${isSettled ? 'disabled' : (selectedLogIds.has(String(log.id)) ? 'checked' : '')}
+                     onchange="handleRowCheck(this)">
+            </td>
             <td data-label="Date" class="mono">${log.date}</td>
             <td data-label="College / Section">${up(log.college_name)} (${up(log.section)})</td>
             <td data-label="Day Type">${log.day_type}</td>
             <td data-label="Description">${log.description || '-'}</td>
             <td data-label="Travel Exp." class="mono">₹${log.travel_expense || 0}</td>
             <td data-label="Food Exp." class="mono">₹${log.food_expense || 0}</td>
-            <td data-label="Gross" class="mono" style="color:var(--teal); font-weight:700;">₹${log.gross_earnings}</td>
-            <td data-label="Status">${statusMarkup(log.status)}</td>`;
+            <td data-label="Gross" class="mono" style="color:var(--teal); font-weight:700;">₹${log.gross_earnings || (base + exp)}</td>
+            <td data-label="Status">${isSettled ? '<span class="status-tag status-approved">Settled</span>' : '<span class="status-tag status-pending">Unsettled</span>'}</td>`;
           tbody.appendChild(tr);
         });
       }
 
-      // If Fixed Salary employee has pending logs, add monthly base salary ONCE
-      if (currentUserData && currentUserData.employment_type === 'Fixed Salary' && hasPendingLogs) {
-        pendingGrossSum = Number(currentUserData.default_rate || 0);
-      }
+      // Compute Global Summary Cards
+      const netPayable = (totalUnsettledGross + totalUnsettledExp) - currentUserAdvanceOwed;
 
-      // Net Pending Payable = (Pending Base + Pending Expenses) - Advance Owed
-      const netPayable = (pendingGrossSum + pendingExpSum) - currentUserAdvanceOwed;
-
-      document.getElementById('cardGrossPay').innerText = '₹' + pendingGrossSum.toLocaleString('en-IN');
-      document.getElementById('cardExpenses').innerText = '₹' + pendingExpSum.toLocaleString('en-IN');
+      document.getElementById('cardGrossPay').innerText = '₹' + totalUnsettledGross.toLocaleString('en-IN');
+      document.getElementById('cardExpenses').innerText = '₹' + totalUnsettledExp.toLocaleString('en-IN');
       document.getElementById('cardAdvance').innerText = '₹' + currentUserAdvanceOwed.toLocaleString('en-IN');
 
       const netPayableVal = document.getElementById('cardNetPayable');
@@ -682,6 +710,55 @@
         netPayableLabel.innerText = "Net Pending Payable";
         netPayableVal.innerText = '₹' + netPayable.toLocaleString('en-IN');
         netPayableVal.style.color = "var(--teal)";
+      }
+
+      updateSelectedMetrics();
+    }
+
+    function handleRowCheck(checkbox) {
+      const id = checkbox.dataset.id;
+      if (checkbox.checked) {
+        selectedLogIds.add(id);
+      } else {
+        selectedLogIds.delete(id);
+      }
+      updateSelectedMetrics();
+    }
+
+    function toggleSelectAll(masterCheckbox) {
+      const checkboxes = document.querySelectorAll('.log-checkbox:not(:disabled)');
+      checkboxes.forEach(cb => {
+        cb.checked = masterCheckbox.checked;
+        if (masterCheckbox.checked) {
+          selectedLogIds.add(cb.dataset.id);
+        } else {
+          selectedLogIds.delete(cb.dataset.id);
+        }
+      });
+      updateSelectedMetrics();
+    }
+
+    function updateSelectedMetrics() {
+      let selectedTotal = 0;
+      let count = 0;
+
+      document.querySelectorAll('.log-checkbox:checked:not(:disabled)').forEach(cb => {
+        selectedTotal += parseFloat(cb.dataset.gross || 0);
+        count++;
+      });
+
+      document.getElementById('selectedCount').innerText = count;
+      document.getElementById('selectedAmount').innerText = '₹' + selectedTotal.toLocaleString('en-IN');
+
+      const disburseBtn = document.getElementById('disburseSelectedBtn');
+      disburseBtn.innerText = `💰 Disburse Selected (₹${selectedTotal.toLocaleString('en-IN')})`;
+      disburseBtn.disabled = count === 0;
+
+      // Sync select-all header box
+      const availableUnsettled = document.querySelectorAll('.log-checkbox:not(:disabled)');
+      const master = document.getElementById('selectAllCheckbox');
+      if (master) {
+        master.checked = availableUnsettled.length > 0 && count === availableUnsettled.length;
       }
     }
 
@@ -697,7 +774,8 @@
 
       filtered.forEach(l => {
         const desc = (l.description || '-').replace(/"/g, '""');
-        csv += `"${l.date}","${l.college_name}","${l.section}","${l.day_type}","${desc}","${l.travel_expense || 0}","${l.food_expense || 0}","${l.gross_earnings}","${l.status}"\n`;
+        const status = l.is_settled ? 'Settled' : 'Unsettled';
+        csv += `"${l.date}","${l.college_name}","${l.section}","${l.day_type}","${desc}","${l.travel_expense || 0}","${l.food_expense || 0}","${l.gross_earnings}","${status}"\n`;
       });
 
       const uri = encodeURI(csv);
@@ -714,44 +792,35 @@
       document.getElementById('adminInspectionZone').classList.add('hidden');
       currentInspectedUser = null;
       currentUserData = null;
+      selectedLogIds.clear();
     }
 
-    function statusMarkup(status) {
-      return status === 'Approved'
-        ? `<span class="status-tag status-approved">Approved</span>`
-        : `<span class="status-tag status-pending">Pending</span>`;
-    }
-
-    /* --- Payout Settlement Modal --- */
+    /* --- Payout Settlement Modal & Execution --- */
     function openPayoutModal() {
-      if (!currentInspectedUser) return;
-      const filtered = getFilteredLogs();
-
-      let pendingGrossSum = 0;
-      let pendingExpSum = 0;
-      let hasPendingLogs = false;
-
-      filtered.forEach(l => {
-        if (l.status === 'Pending') {
-          hasPendingLogs = true;
-          if (currentUserData && currentUserData.employment_type !== 'Fixed Salary') {
-            pendingGrossSum += Number(l.base_pay || 0);
-          }
-          pendingExpSum += (Number(l.travel_expense || 0) + Number(l.food_expense || 0));
-        }
-      });
-
-      if (currentUserData && currentUserData.employment_type === 'Fixed Salary' && hasPendingLogs) {
-        pendingGrossSum = Number(currentUserData.default_rate || 0);
+      if (!currentInspectedUser || selectedLogIds.size === 0) {
+        toast('Please select at least one record to disburse payout.', 'error');
+        return;
       }
 
-      const netPayable = Math.max(0, (pendingGrossSum + pendingExpSum) - currentUserAdvanceOwed);
+      let selectedGrossSum = 0;
+      let selectedExpSum = 0;
+
+      document.querySelectorAll('.log-checkbox:checked:not(:disabled)').forEach(cb => {
+        selectedGrossSum += parseFloat(cb.dataset.base || 0);
+        selectedExpSum += parseFloat(cb.dataset.exp || 0);
+      });
+
+      const totalSelectedEarnings = selectedGrossSum + selectedExpSum;
+      
+      // Calculate advance deducted against this specific batch
+      const advanceDeducted = Math.min(currentUserAdvanceOwed, totalSelectedEarnings);
+      const recommendedNetPaid = Math.max(0, totalSelectedEarnings - advanceDeducted);
 
       document.getElementById('payoutEmpTarget').innerText = currentInspectedUser;
-      document.getElementById('payoutGross').value = pendingGrossSum;
-      document.getElementById('payoutExpenses').value = pendingExpSum;
-      document.getElementById('payoutNetPaid').value = netPayable;
-      
+      document.getElementById('payoutGross').value = totalSelectedEarnings;
+      document.getElementById('payoutAdvanceDeducted').value = advanceDeducted;
+      document.getElementById('payoutNetPaid').value = recommendedNetPaid;
+
       document.getElementById('payoutModal').classList.add('active');
     }
 
@@ -763,41 +832,36 @@
       e.preventDefault();
       const restore = withLoading(document.getElementById('confirmPayoutBtn'), 'Processing…');
 
-      const gross = parseFloat(document.getElementById('payoutGross').value) || 0;
-      const exp = parseFloat(document.getElementById('payoutExpenses').value) || 0;
+      const grossToClear = parseFloat(document.getElementById('payoutGross').value) || 0;
       const cashPaidToday = parseFloat(document.getElementById('payoutNetPaid').value) || 0;
       const mode = document.getElementById('payoutMode').value;
-      const remarks = document.getElementById('payoutRemarks').value.trim() || 'Salary Payout Settlement';
+      const remarks = document.getElementById('payoutRemarks').value.trim() || `Disbursed for ${selectedLogIds.size} logs`;
+
+      const targetIds = Array.from(selectedLogIds).map(id => Number(id));
 
       try {
         // 1. Insert transaction record into payout_records
         const { error: payoutErr } = await sb.from('payout_records').insert({
           username: currentInspectedUser,
-          gross_amount: gross,
-          expense_amount: exp,
+          gross_amount: grossToClear,
+          expense_amount: 0,
           net_paid: cashPaidToday,
           payment_mode: mode,
           remarks: remarks
         });
 
-        if (payoutErr) {
-          console.error('Supabase Insert Error:', payoutErr);
-          toast(`Payout Failed: ${payoutErr.message}`, 'error');
-          return;
-        }
+        if (payoutErr) throw payoutErr;
 
-        // 2. Mark pending logs as Approved ONLY IF there are pending logs
-        const hasPendingLogs = activeInspectionLogs.some(l => l.status === 'Pending');
-        if (hasPendingLogs) {
-          const { error: logErr } = await sb.from('tracker_logs')
-            .update({ status: 'Approved' })
-            .eq('username', currentInspectedUser)
-            .eq('status', 'Pending');
-          if (logErr) throw logErr;
-        }
+        // 2. Mark ONLY the selected log IDs as is_settled = TRUE
+        const { error: logErr } = await sb.from('tracker_logs')
+          .update({ is_settled: true })
+          .in('id', targetIds);
 
-        toast('Payout disbursed successfully!', 'success');
+        if (logErr) throw logErr;
+
+        toast('Payout disbursed & logs marked as settled!', 'success');
         closePayoutModal();
+        selectedLogIds.clear();
         await loadEmployeeDirectory();
         await inspectUserLogs(currentInspectedUser);
       } catch (err) {
