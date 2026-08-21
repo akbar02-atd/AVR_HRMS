@@ -50,6 +50,7 @@ body {
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
+  padding: 0 24px;
 }
 
 /* Typography */
@@ -293,9 +294,36 @@ tbody tr:last-child td { border-bottom: none; }
   body {
     padding: 0 0 40px;
   }
-  
+
+  .container {
+    padding: 0 16px;
+  }
+
   .card {
     padding: 18px;
+  }
+
+  h1 { font-size: 22px; }
+  h2 { font-size: 19px; }
+  h3 { font-size: 16px; }
+  h4 { font-size: 14.5px; }
+
+  /* Prevent iOS Safari auto-zoom on focus (needs >=16px) and guarantee tap-friendly height */
+  input, select, textarea {
+    font-size: 16px;
+    min-height: 44px;
+  }
+
+  button {
+    min-height: 44px;
+    width: 100%;
+  }
+
+  /* Buttons that sit side-by-side in a flex row (e.g. action bars) shouldn't
+     stretch full width — only stack full-width when alone/stacked */
+  .flex-space button,
+  .table-wrap button {
+    width: auto;
   }
 
   table { min-width: 0; }
@@ -330,5 +358,30 @@ tbody tr:last-child td { border-bottom: none; }
     color: var(--ink-soft);
     text-align: left;
     flex-shrink: 0;
+  }
+}
+
+/* Very small phones (older/compact devices, ~360-380px wide) */
+@media (max-width: 380px) {
+  .container {
+    padding: 0 12px;
+  }
+
+  .card {
+    padding: 14px;
+  }
+
+  .login-badge {
+    width: 46px;
+    height: 46px;
+    font-size: 17px;
+  }
+
+  h1 { font-size: 19px; }
+  h2 { font-size: 17px; }
+
+  button {
+    padding: 12px 14px;
+    font-size: 13.5px;
   }
 }

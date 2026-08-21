@@ -28,16 +28,23 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
     }
     .brand-identity {
       display: flex;
       align-items: center;
       gap: 16px;
+      min-width: 0; /* allow text to shrink/wrap inside flex parent */
     }
     .company-logo {
       height: 48px;
       width: auto;
       object-fit: contain;
+      flex-shrink: 0;
+    }
+    .brand-text {
+      min-width: 0;
     }
     .company-title {
       color: #fff;
@@ -58,11 +65,13 @@
       align-items: center;
       justify-content: center;
       padding: 40px 16px;
+      box-sizing: border-box;
     }
     .login-card-custom {
       max-width: 420px;
       width: 100%;
       border-top: 4px solid var(--navy);
+      box-sizing: border-box;
     }
 
     .main-site-footer {
@@ -115,12 +124,72 @@
       color: #94a3b8;
     }
 
+    /* Tablet and below */
     @media (max-width: 768px) {
-      .footer-container {
-        grid-template-columns: 1fr;
+      .main-site-header {
+        padding: 14px 16px;
       }
       .company-title {
         font-size: 16px;
+      }
+      .portal-subtext {
+        font-size: 11px;
+      }
+      .login-container-wrapper {
+        padding: 28px 16px;
+      }
+      .main-site-footer {
+        padding: 28px 16px 16px;
+      }
+      .footer-container {
+        grid-template-columns: 1fr;
+        gap: 24px;
+      }
+    }
+
+    /* Small phones */
+    @media (max-width: 480px) {
+      .header-container {
+        justify-content: center;
+        text-align: center;
+      }
+      .brand-identity {
+        flex-direction: column;
+        gap: 8px;
+        text-align: center;
+      }
+      .company-logo {
+        height: 36px;
+      }
+      .company-title {
+        font-size: 15px;
+      }
+      .portal-subtext {
+        font-size: 10px;
+      }
+      .login-container-wrapper {
+        padding: 20px 12px;
+      }
+      .login-card-custom {
+        padding: 20px 16px;
+      }
+      .footer-address,
+      .footer-contact-list {
+        font-size: 12.5px;
+      }
+      .footer-bottom {
+        font-size: 11px;
+        padding-top: 12px;
+      }
+    }
+
+    /* Very small phones (older/small devices) */
+    @media (max-width: 360px) {
+      .company-title {
+        font-size: 14px;
+      }
+      .login-card-custom h2 {
+        font-size: 18px;
       }
     }
   </style>

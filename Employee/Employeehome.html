@@ -310,7 +310,6 @@
   <div id="emp-footer-placeholder"></div>
 
   <div id="globalToast"></div>
-
   <script>
     let state = {
       currentUser: null,
@@ -448,7 +447,6 @@
         const dept = up(r.department || 'GEN');
         const year = r.academic_year || '1st Yr';
         
-        // Parse comma-separated section names (e.g. "CSE-A, CSE-B, CSE-C")
         const sectionList = (r.section_name || '').split(',').map(s => s.trim()).filter(Boolean);
 
         sectionList.forEach(sec => {
@@ -460,21 +458,14 @@
       select.innerHTML = optionsHTML;
     }
 
-    /**
-     * Helper to compute base pay based on employment type.
-     * Fixed Salary employees receive monthly base pay, so daily logs track expenses only (₹0 base pay).
-     */
     function getDailyBasePay(user, dayType) {
       const defaultRate = Number(user.default_rate || 0);
       const empType = user.employment_type || 'Freelance';
 
-      if (empType === 'Fixed Salary') {
-        return 0; // Fixed salary staff get ₹0 base pay per daily field log
-      }
-
+      if (empType === 'Fixed Salary') return 0;
       if (dayType === 'Full Day') return defaultRate;
       if (dayType === 'Half Day') return defaultRate / 2;
-      return 0; // Canceled
+      return 0;
     }
 
     function calculateProjectedPay() {
@@ -505,9 +496,9 @@
         const food = allowFood ? (parseFloat(document.getElementById('logFood').value) || 0) : 0;
         const type = document.getElementById('logDayType').value;
 
-        // Correctly assigns base pay based on employment type
         const base = getDailyBasePay(state.currentUser, type);
 
+        // Fixed payload: status removed and replaced with is_settled
         const newLog = {
           username: state.currentUser.username,
           date: document.getElementById('logDate').value,
@@ -519,7 +510,7 @@
           travel_expense: travel,
           food_expense: food,
           gross_earnings: base + travel + food,
-          status: "Pending"
+          is_settled: false
         };
 
         const { error } = await sb.from('tracker_logs').insert(newLog);
@@ -534,7 +525,7 @@
         toast('Attendance entry committed successfully.', 'success');
       } catch (err) {
         console.error(err);
-        toast('Could not save attendance log.', 'error');
+        toast(`Could not save attendance log: ${err.message || 'Database error'}`, 'error');
       } finally {
         restore();
       }
@@ -627,7 +618,7 @@
           <td data-label="Type">${log.day_type}</td>
           <td data-label="Reimbursements" class="mono">T: ₹${log.travel_expense || 0} · F: ₹${log.food_expense || 0}</td>
           <td data-label="Gross" class="mono" style="color:var(--teal); font-weight:700;">₹${log.gross_earnings}</td>
-          <td data-label="Status">${statusMarkup(log.status)}</td>
+          <td data-label="Status">${statusMarkup(log.is_settled)}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -638,10 +629,10 @@
       document.getElementById('mGross').innerText = "₹" + metrics.gross.toLocaleString('en-IN');
     }
 
-    function statusMarkup(status) {
-      return status === 'Approved'
-        ? `<span class="status-tag status-approved">Approved</span>`
-        : `<span class="status-tag status-pending">Pending</span>`;
+    function statusMarkup(isSettled) {
+      return isSettled
+        ? `<span class="status-tag status-approved">Settled</span>`
+        : `<span class="status-tag status-pending">Unsettled</span>`;
     }
 
     function openPasswordModal() { document.getElementById('passwordModal').classList.add('active'); }
@@ -670,5 +661,6 @@
       }
     }
   </script>
+
 </body>
 </html>
